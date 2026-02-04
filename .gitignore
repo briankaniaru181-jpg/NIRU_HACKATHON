@@ -1,0 +1,16 @@
+# Python clutter
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+
+# Data and Models (Keep the folders, ignore the heavy files)
+data/raw/*
+data/processed/*
+models/trained_models/*
+!*/.gitkeep
+
+# OS related
+.DS_Store
+Thumbs.db
