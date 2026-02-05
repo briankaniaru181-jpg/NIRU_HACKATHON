@@ -1,22 +1,22 @@
-Sauti AI
+# Sauti AI
 
 A Reproducible, Parameter-Efficient Framework for African Language Conversational AI
 
 A two-stage training methodology for culturally grounded Swahili and Kenyan languages
 
-Executive Summary
+## Executive Summary
 
 Sauti AI is a production-oriented conversational AI framework designed for African languages, beginning with Swahili and extending systematically to Kikuyu and other Kenyan languages. The project introduces a validated two-stage training methodology—continued pretraining followed by conversational fine-tuning—implemented using parameter-efficient techniques (LoRA + 4-bit quantization) on accessible hardware.
 
 An initial Swahili implementation of this methodology achieved a validation perplexity of 3.97, with end-to-end training completed in approximately 9 hours on a single P100 GPU. During the NIRU AI Hackathon 2026, this repository serves both as:
 
-A record of validated results, and
+1) A record of validated results, and
 
-A reproducible framework, which will be re-executed publicly during the competition period.
+2) A reproducible framework, which will be re-executed publicly during the competition period.
 
 Because training outcomes depend on stochastic initialization, hardware variance, and data ordering, future runs may produce slightly different metrics. Accordingly, this repository emphasizes methodological reproducibility and engineering rigor, not one-off numerical claims.
 
-What This Repository Represents
+### What This Repository Represents
 
 ✅ A proven training architecture for low-resource African languages
 
@@ -28,104 +28,104 @@ What This Repository Represents
 
 This distinction is intentional and central to the project’s scientific and engineering integrity.
 
-Core Methodology: Two-Stage Training
-Stage 1 — Continued Pretraining
+### Core Methodology: Two-Stage Training
+### Stage 1 — Continued Pretraining
 
-Linguistic & Cultural Foundation
+#### Linguistic & Cultural Foundation
 
-Objective
+##### Objective
 To strengthen the base model’s internal representation of Swahili grammar, narrative structure, metaphor, and cultural context before any conversational specialization.
 
-Validated Swahili configuration
+Validated Swahili configuration:
 
-Base model: CraneAILabs/swahili-gemma-1b
+- Base model: CraneAILabs/swahili-gemma-1b
 
-Corpus size: ~18 million tokens
+- Corpus size: ~18 million tokens
 
-Epochs: 2
+- Epochs: 2
 
-Duration: ~6 hours
+- Duration: ~6 hours
 
-Hardware: Single P100 GPU (16GB VRAM)
+- Hardware: Single P100 GPU (16GB VRAM)
 
-Training method: LoRA + 4-bit NF4 quantization
+- Training method: LoRA + 4-bit NF4 quantization
 
-Corpus composition
+##### Corpus composition
 
-Classical and modern Swahili literature
+- Classical and modern Swahili literature
 
-Folktales and Zanzibar narratives
+- Folktales and Zanzibar narratives
 
-Swahili Bible and canonical prose
+- Swahili Bible and canonical prose
 
-Expert-validated Swahili translations of public-domain world literature
+- Expert-validated Swahili translations of public-domain world literature
 
-News, encyclopedic, and formal registers
+- News, encyclopedic, and formal registers
 
 This stage establishes deep linguistic grounding, reducing overfitting and instability during dialogue fine-tuning.
 
-Stage 2 — Conversational Fine-Tuning
+### Stage 2 — Conversational Fine-Tuning
 
-Dialogue Specialization
+#### Dialogue Specialization
 
-Objective
+##### Objective
 To teach the model how to engage in natural, culturally appropriate conversation, without erasing the linguistic depth acquired during pretraining.
 
 Validated Swahili configuration
 
-Dataset size: 3,175 curated dialogue examples
+- Dataset size: 3,175 curated dialogue examples
 
-Train/validation split: 2,857 / 318
+- Train/validation split: 2,857 / 318
 
-Epochs: 7
+- Epochs: 7
 
-Duration: ~2.5 hours
+- Duration: ~2.5 hours
 
-Formatting: Gemma-style conversational tokens
+- Formatting: Gemma-style conversational tokens
 
 Observed outcome (one validated run)
 
-Training loss: ~1.12
+- Training loss: ~1.12
 
-Validation loss: ~1.387
+- Validation loss: ~1.387
 
-Validation perplexity: 3.97
+- Validation perplexity: 3.97
 
 Important: These values are documented results. Re-executions may vary modestly while remaining within the same performance.
 
-Parameter-Efficient Training Strategy
+#### Parameter-Efficient Training Strategy
 
 Sauti AI is designed to be computationally accessible, not infrastructure-heavy.
 
-LoRA Configuration
+##### LoRA Configuration
 
-Rank: 8
+- Rank: 8
 
-Alpha: 16
+- Alpha: 16
 
-Target modules: q_proj, k_proj, v_proj, o_proj
+- Target modules: q_proj, k_proj, v_proj, o_proj
 
-Dropout: 0.05
+- Dropout: 0.05
 
-Trainable parameters: ~0.5% of the base model
+- Trainable parameters: ~0.5% of the base model
 
-Quantization
+##### Quantization
 
-4-bit NF4 with double quantization
+- 4-bit NF4 with double quantization
 
-FP16 compute
+- FP16 compute
 
-~4× memory reduction
+- ~4× memory reduction
 
 This enables single-GPU training without measurable degradation in conversational quality.
 
-🚀 Quick Start (Minimal & Reproducible)
+#### 🚀 Quick Start (Minimal & Reproducible)
 
 This section provides a minimal, example-based entry point for running the Sauti AI training pipeline.
 
 Note: Exact losses and perplexity values may vary across runs due to stochastic training dynamics, hardware differences, and data ordering.
 
-Prerequisites
+#### Prerequisites
 
 Python 3.9+
 
@@ -134,14 +134,14 @@ CUDA-capable GPU (16GB VRAM recommended)
 Git LFS (for large model and dataset files)
 
 Installation
-# Clone the repository
+### Clone the repository
 git clone https://github.com/briankaniaru181-jpg/NIRU_HACKATHON.git
 cd NIRU_HACKATHON
 
-# Install dependencies
+### Install dependencies
 pip install -r requirements.txt
 
-# Initialize Git LFS
+### Initialize Git LFS
 git lfs install
 git lfs pull
 
@@ -169,7 +169,7 @@ python src/inference.py \
   --model_path models/final \
   --prompt "Habari, unaweza kunisaidia?"
 
-Reproducibility Commitment
+## Reproducibility Commitment
 
 During the NIRU AI Hackathon 2026, I will:
 
@@ -213,13 +213,13 @@ Swahili • Kikuyu • Kamba • Luhya • Luo • Kalenjin • Maasai
 
 This enables:
 
-Voice-based interaction
+- Voice-based interaction
 
-Subtitle generation for creators
+- Subtitle generation for creators
 
-Preservation of oral traditions for low-resource languages
+- Preservation of oral traditions for low-resource languages
 
-Extension to Kikuyu
+##### Extension to Kikuyu
 
 The same two-stage framework is being applied to Kikuyu:
 
@@ -233,7 +233,7 @@ Swahili serves as the proof of methodology, not an isolated success.
 
 Limitations & Future Directions
 
-Current limitations
+## Current limitations
 
 Conversational dataset size remains modest
 
