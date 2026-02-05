@@ -1,6 +1,6 @@
 # Stage 1: Continued Pretraining Configuration
 base_model: "CraneAILabs/swahili-gemma-1b"
-dataset_path: "Corpus/FinetuningJSONL.jsonl"
+dataset_path: dataset_path: "Corpus/swahili_gemma_pretraining_data/SWAHILI_MASTER_PRETRAINING.jsonl"
 # LoRA Configuration
 lora_r: 8
 lora_alpha: 16
