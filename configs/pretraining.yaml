@@ -1,0 +1,29 @@
+# Stage 1: Continued Pretraining Configuration
+base_model: "CraneAILabs/swahili-gemma-1b"
+dataset_path: "Corpus/FinetuningJSONL.jsonl"
+# LoRA Configuration
+lora_r: 8
+lora_alpha: 16
+lora_dropout: 0.05
+target_modules:
+  - q_proj
+  - v_proj
+  - k_proj
+  - o_proj
+
+# Training Parameters
+num_epochs: 2
+learning_rate: 2e-4
+batch_size: 4
+max_seq_length: 512
+gradient_accumulation_steps: 4
+
+# Quantization
+use_4bit: true
+bnb_4bit_compute_dtype: "float16"
+bnb_4bit_quant_type: "nf4"
+
+# Logging
+logging_steps: 10
+save_steps: 500
+eval_steps: 500

@@ -1,0 +1,26 @@
+# Stage 2: Conversational Fine-tuning Configuration
+base_model: "models/pretrained"  # Output from Stage 1
+dataset_path: "data/swahili_conversations.json"
+
+# LoRA Configuration (same as pretraining)
+lora_r: 8
+lora_alpha: 16
+lora_dropout: 0.05
+target_modules:
+  - q_proj
+  - v_proj
+  - k_proj
+  - o_proj
+
+# Training Parameters
+num_epochs: 7
+learning_rate: 2e-4
+batch_size: 4
+max_seq_length: 512
+
+# Validation
+validation_split: 0.1
+
+# Logging
+logging_steps: 10
+save_steps: 100
