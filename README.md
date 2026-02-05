@@ -173,39 +173,37 @@ python src/inference.py \
 
 During the NIRU AI Hackathon 2026, I will:
 
-Re-execute Stage 1 (continued pretraining) from scratch
+- Re-execute Stage 1 (continued pretraining) from scratch
 
-Re-execute Stage 2 (conversational fine-tuning)
+- Re-execute Stage 2 (conversational fine-tuning)
 
-Publish training logs, checkpoints, and metrics
+- Publish training logs, checkpoints, and metrics
 
-Document deviations from prior runs
+- Document deviations from prior runs
 
-The objective is not to reproduce a single number, but to demonstrate that:
+The objective is not to reproduce a single number, but to demonstrate that the methodology reliably produces high-quality African-language conversational models under constrained resources.
 
-The methodology reliably produces high-quality African-language conversational models under constrained resources.
+## Dual-Interface System (Implemented)
 
-Dual-Interface System (Implemented)
+A single trained model serves three production interfaces:
 
-A single trained model serves two production interfaces:
+### 1. Kiswahili Learning Assistant (RAG)
 
-1. Kiswahili Learning Assistant (RAG)
+- Curriculum-aligned knowledge base (Forms 1–4)
 
-Curriculum-aligned knowledge base (Forms 1–4)
+- Semantic retrieval
 
-Semantic retrieval
+- Confidence scoring for educational reliability
 
-Confidence scoring for educational reliability
+### 2. General Conversation Assistant
 
-2. General Conversation Assistant
+- Open-domain dialogue
 
-Open-domain dialogue
+- Creative and casual interaction
 
-Creative and casual interaction
+- Prompt-guided generation
 
-Prompt-guided generation
-
-Speech-to-Text Integration (Planned & In Progress)
+### 3. Speech-to-Text Integration (Planned & In Progress)
 
 Using Meta’s Omnilingual ASR, Sauti AI supports transcription in:
 
@@ -219,36 +217,35 @@ This enables:
 
 - Preservation of oral traditions for low-resource languages
 
-##### Extension to Kikuyu
+## Extension to Kikuyu
 
 The same two-stage framework is being applied to Kikuyu:
 
-Stage 1 target: 4–6M tokens
+- Stage 1 target: 4–6M tokens
 
-Stage 2 target: ~1,500 conversations
+- Stage 2 target: ~1,500 conversations
 
-Data sources include oral traditions transcribed via ASR, translated literature, and native-speaker-validated text
+Data sources include oral traditions transcribed via ASR, web-scraped content,  public-domain literature, and native-speaker-validated text
 
-Swahili serves as the proof of methodology, not an isolated success.
+Swahili serves as the proof of methodology.
 
-Limitations & Future Directions
 
 ## Current limitations
 
-Conversational dataset size remains modest
+- Conversational dataset size remains modest
 
-Literary translations may retain subtle cultural transfer artifacts
+- Literary translations may retain subtle cultural transfer artifacts
 
-Evaluation relies primarily on perplexity and expert review
+- Evaluation relies primarily on perplexity and expert review
 
-Future work
+## Future work
 
-Expansion to additional Kenyan and African languages
+- Expansion to additional Kenyan and African languages
 
-Larger conversational datasets
+- Larger conversational datasets
 
-Domain-specific assistants (education, health, agriculture)
+- Domain-specific assistants (education, health, agriculture)
 
-Broader human evaluation studies
+- Broader human evaluation studies
 
-Multimodal extensions beyond speech-to-text
+- Multimodal extensions beyond speech-to-text
