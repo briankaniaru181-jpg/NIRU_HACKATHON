@@ -142,32 +142,41 @@ cd NIRU_HACKATHON
 pip install -r requirements.txt
 
 ### Initialize Git LFS
+
+```bash
 git lfs install
 git lfs pull
+```
+---
 
-Stage 1 — Continued Pretraining (Example)
+#### Stage 1 — Continued Pretraining
+
+```bash
 python src/training_pipeline.py \
   --stage pretraining \
   --config configs/pretraining.yaml \
   --output_dir models/pretrained
+```
+---
 
+#### Stage 2 — Conversational Fine-Tuning
 
-Typical runtime (validated Swahili configuration): ~6 hours on a single P100 GPU.
-
-Stage 2 — Conversational Fine-Tuning (Example)
+```bash
 python src/training_pipeline.py \
   --stage finetuning \
   --base_model models/pretrained \
   --config configs/finetuning.yaml \
   --output_dir models/final
+```
+---
 
+## Inference 
 
-Typical runtime (validated Swahili configuration): ~2–3 hours on a single GPU.
-
-Inference (Optional)
+```bash
 python src/inference.py \
   --model_path models/final \
   --prompt "Habari, unaweza kunisaidia?"
+```
 
 ## Reproducibility Commitment
 
