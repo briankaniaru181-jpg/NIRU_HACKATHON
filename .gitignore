@@ -14,3 +14,14 @@ models/trained_models/*
 # OS related
 .DS_Store
 Thumbs.db
+outputs/
+metrics/
+plots/
+completions/
+checkpoints/
+*.json
+*.csv
+*.png
+logs/
+__pycache__/
+*.pyc
