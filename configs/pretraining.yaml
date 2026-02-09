@@ -1,6 +1,14 @@
 # Stage 1: Continued Pretraining Configuration
+# ===========================================
+
+# Model Configuration
 base_model: "CraneAILabs/swahili-gemma-1b"
-dataset_path: dataset_path: "Corpus/swahili_gemma_pretraining_data/SWAHILI_MASTER_PRETRAINING.jsonl"
+
+# Dataset Configuration
+dataset_path: "Corpus/swahili_gemma_pretraining_data/SWAHILI_MASTER_PRETRAINING.jsonl"
+text_field: "text"  # Which field in JSONL contains the text
+max_samples: null   # Set to number if you want to limit samples
+
 # LoRA Configuration
 lora_r: 8
 lora_alpha: 16
@@ -17,13 +25,40 @@ learning_rate: 2e-4
 batch_size: 4
 max_seq_length: 512
 gradient_accumulation_steps: 4
+warmup_ratio: 0.1
+weight_decay: 0.01
+optimizer: "paged_adamw_8bit"
+lr_scheduler_type: "cosine"
 
 # Quantization
 use_4bit: true
 bnb_4bit_compute_dtype: "float16"
 bnb_4bit_quant_type: "nf4"
+bnb_4bit_use_double_quant: true
 
-# Logging
-logging_steps: 10
-save_steps: 500
-eval_steps: 500
+# Output Configuration
+output_dir: "models/swahili-linguistic-foundation"
+save_total_limit: 3
+load_best_model_at_end: true
+metric_for_best_model: "eval_loss"
+
+# Logging & Evaluation
+logging_steps: 50
+save_steps: 100
+eval_steps: 100
+logging_dir: "results/logs"
+report_to: "none"  # Change to "wandb" or "tensorboard" if using
+
+# Early Stopping
+early_stopping_patience: 3
+early_stopping_threshold: 0.001
+
+# Sequence Packing (for efficiency)
+use_sequence_packing: true
+
+# Device & Performance
+gradient_checkpointing: true
+dataloader_num_workers: 2
+remove_unused_columns: false
+bf16: false  # Set to true if your GPU supports bfloat16
+tf32: false  # Set to true if your GPU supports TF32
