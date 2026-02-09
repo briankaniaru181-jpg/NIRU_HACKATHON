@@ -152,10 +152,8 @@ git lfs pull
 #### Stage 1 — Continued Pretraining
 
 ```bash
-python src/training_pipeline.py \
-  --stage pretraining \
-  --config configs/pretraining.yaml \
-  --output_dir models/pretrained
+python src/stage1_pretraining_kaggle.py
+
 ```
 ---
 
