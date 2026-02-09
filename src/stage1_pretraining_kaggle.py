@@ -500,10 +500,10 @@ class TrainingConfig:
     TEXT_FIELD: str = "text"
     TOKENIZED_DATA_PATH: str = "/kaggle/working/tokenized_packed"
     
-    MAX_LENGTH: int = 1024  # REDUCED from 2048
+    MAX_LENGTH: int = 512  # REDUCED from 2048
     USE_SEQUENCE_PACKING: bool = True
     
-    EPOCHS: int = 1
+    EPOCHS: int = 0.5
     BATCH_SIZE: int = 2  # REDUCED from 4
     GRADIENT_ACCUMULATION_STEPS: int = 16  # INCREASED from 8
     LEARNING_RATE: float = 5e-5
@@ -539,7 +539,7 @@ class SequencePacker:
     def tokenize_with_packing(
         texts: List[str],
         tokenizer,
-        max_length: int = 2048,
+        max_length: int = 512,
     ) -> Dict:
         """Tokenize texts with sequence packing"""
         print("📦 Tokenizing with sequence packing...")
@@ -1186,7 +1186,7 @@ class ComprehensiveMetricsCallback(TrainerCallback):
 def load_jsonl_dataset_with_packing(
     tokenizer, 
     data_path: str, 
-    max_length: int = 2048,
+    max_length: int = 512,
     text_field: str = "text",
     test_size: float = 0.1,
     use_packing: bool = True,
@@ -1369,7 +1369,8 @@ def main():
         output_dir=train_config.OUTPUT_DIR,
         num_train_epochs=train_config.EPOCHS,
         per_device_train_batch_size=train_config.BATCH_SIZE,
-        per_device_eval_batch_size=train_config.BATCH_SIZE // 2,
+        per_device_eval_batch_size=train_config.BATCH_SIZE // 1,
+        eval_accumulation_steps=16, 
         gradient_accumulation_steps=train_config.GRADIENT_ACCUMULATION_STEPS,
         learning_rate=train_config.LEARNING_RATE,
         warmup_ratio=train_config.WARMUP_RATIO,
