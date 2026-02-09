@@ -1,27 +1,67 @@
-# Python clutter
+# ========== PYTHON CLUTTER ==========
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyc
 .venv/
 env/
+venv/
+.python-version
 
-# Data and Models (Keep the folders, ignore the heavy files)
-data/raw/*
-data/processed/*
-models/trained_models/*
-!*/.gitkeep
-
-# OS related
+# ========== OS RELATED ==========
 .DS_Store
 Thumbs.db
-outputs/
-metrics/
-plots/
-completions/
-checkpoints/
-*.json
-*.csv
-*.png
-logs/
-__pycache__/
-*.pyc
+desktop.ini
+
+# ========== DATA AND MODELS ==========
+# Corpus data (raw - keep, processed - ignore)
+Corpus/raw/.gitkeep     # Keep this empty file
+Corpus/processed/*      # Ignore processed data
+!Corpus/processed/.gitkeep  # But keep the folder structure
+
+# Models and outputs
+models/trained_models/*
+models/checkpoints/*
+models/swahili-linguistic-foundation/*
+!models/.gitkeep
+!models/trained_models/.gitkeep
+
+# ========== PRETRAINING SCRIPT OUTPUTS ==========
+results/metrics/*.json
+results/metrics/*.csv
+results/plots/*.png
+results/completions/*.json
+results/logs/*
+
+# Kaggle-specific
+/kaggle/working/*
+!/kaggle/working/.gitkeep
+swahili-linguistic-foundation/
+
+# ========== LARGE FILES ==========
+*.safetensors
+*.bin
+*.pth
+*.pt
+*.h5
+*.pkl
+*.pickle
+*.joblib
+*.npy
+*.npz
+
+# ========== NOTEBOOK OUTPUTS ==========
+.ipynb_checkpoints/
+notebooks/*.ipynb
+!notebooks/.gitkeep
+
+# ========== IDE/SYSTEM ==========
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ========== HUGGING FACE/DEEPSPEED ==========
+~/.cache/huggingface/
+.huggingface/
+.deepspeed_cache/
