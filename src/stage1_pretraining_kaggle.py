@@ -9,29 +9,24 @@ WITH COMPREHENSIVE MONITORING, TRACKING, CHECKPOINT RECOVERY & SWAHILI EARLY STO
 Supports JSONL Dataset Format + Full Checkpoint Recovery + Sequence Packing + Swahili Score Tracking
 
 Metrics tracked:
-1. Perplexity ⭐⭐⭐ (Auto, Every eval)
-2. Token Accuracy ⭐⭐ (Auto, Every eval)  
-3. Entropy ⭐⭐ (Auto, Every eval)
-4. Completions ⭐⭐⭐ (Manual, Every 1000 steps)
-5. Language Consistency ⭐⭐ (Manual, Every epoch)
-6. Vocab Coverage ⭐⭐ (Manual, Every epoch)
-7. BPC ⭐ (Auto, Every eval)
-8. Training Stability ⭐⭐ (Auto, Continuous)
-9. Swahili Score ⭐⭐⭐ (Language-specific stopping)
+1. Perplexity
+2. Validation loss
+3. Training Stability 
+4. Swahili Score
 
 FEATURES:
-✅ JSONL dataset support with SEQUENCE PACKING
-✅ Comprehensive metrics tracking
-✅ Real-time stability monitoring
-✅ FULL CHECKPOINT RECOVERY
-✅ Automatic training resumption
-✅ MEMORY MONITORING (Kaggle safety)
-✅ Robust device handling
-✅ Dataset sample caching
-✅ SWAHILI SCORE-BASED EARLY STOPPING
-✅ KAGGLE-SPECIFIC OPTIMIZATIONS
-✅ Visualization generation
-✅ Detailed reporting
+1. JSONL dataset support with SEQUENCE PACKING
+2. Comprehensive metrics tracking
+3. Real-time stability monitoring
+4. FULL CHECKPOINT RECOVERY
+5. Automatic training resumption
+6. MEMORY MONITORING (Kaggle safety)
+7. Robust device handling
+8. Dataset sample caching
+9. SWAHILI SCORE-BASED EARLY STOPPING
+10. KAGGLE-SPECIFIC OPTIMIZATIONS
+11. Visualization generation
+12. Detailed reporting
 """
 import os
 os.environ["TORCHVISION_USE_FBCODE"] = "1"  # Disable torchvision custom ops
@@ -65,7 +60,7 @@ class TensorParallelMock(types.ModuleType):
         self.load_tensor_parallel_weights = lambda *args, **kwargs: {}
         self.save_tensor_parallel_weights = lambda *args, **kwargs: None
         
-        # 🔥 CRITICAL MISSING FUNCTIONS
+        #  Other Critical Functions
         self.distribute_model = lambda *args, **kwargs: args[0] if args else None
         self.distribute_optimizer = lambda *args, **kwargs: args[0] if args else None
         self.gather_model = lambda *args, **kwargs: args[0] if args else None
@@ -81,7 +76,7 @@ class TensorParallelMock(types.ModuleType):
 mock = TensorParallelMock()
 sys.modules['transformers.integrations.tensor_parallel'] = mock
 
-print("✅ Aggressive tensor_parallel mock installed")
+print(" Aggressive tensor_parallel mock installed")
 
 # ========== PYTORCH COMPATIBILITY ==========
 import torch
@@ -113,7 +108,7 @@ from tqdm.auto import tqdm
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# Now import transformers - should work with our comprehensive mock
+# import transformers 
 print("\n🔧 Importing transformers...")
 try:
     from transformers import (
@@ -126,18 +121,18 @@ try:
         EarlyStoppingCallback,
         TrainerCallback,
     )
-    print("✅ Successfully imported transformers core modules")
+    print("Successfully imported transformers core modules")
     
-    # Also try to import the actual tensor_parallel to see if it exists
+    # import tensor_parallel
     try:
         import importlib
         actual_tp = importlib.import_module('transformers.integrations.tensor_parallel')
-        print("✅ Actual tensor_parallel module exists, but using mock")
+        print("Actual tensor_parallel module exists, but using mock")
     except:
-        print("ℹ️ No actual tensor_parallel module found, mock is sufficient")
+        print("No actual tensor_parallel module found, mock is sufficient")
         
 except ImportError as e:
-    print(f"❌ Error importing transformers: {e}")
+    print(f"Error importing transformers: {e}")
     print("Trying fallback imports...")
     
     # Fallback: Import transformers and get components directly
@@ -154,7 +149,7 @@ except ImportError as e:
     TrainerCallback = getattr(transformers, 'TrainerCallback', None)
     
     if all([AutoTokenizer, AutoModelForCausalLM, TrainingArguments, Trainer]):
-        print("✅ Successfully imported transformers via fallback")
+        print("Successfully imported transformers via fallback")
     else:
         raise ImportError("Could not import necessary transformers components")
 
@@ -167,9 +162,9 @@ try:
         prepare_model_for_kbit_training,
         TaskType
     )
-    print("✅ Successfully imported PEFT")
+    print("Successfully imported PEFT")
 except ImportError:
-    print("❌ PEFT not available, trying to install...")
+    print("PEFT not available, trying to install...")
     import subprocess
     subprocess.run([sys.executable, "-m", "pip", "install", "peft", "-q"])
     from peft import (
@@ -178,50 +173,48 @@ except ImportError:
         prepare_model_for_kbit_training,
         TaskType
     )
-    print("✅ Installed and imported PEFT")
+    print("Installed and imported PEFT")
 
 # ========== KAGGLE-SPECIFIC OPTIMIZATIONS ==========
 def kaggle_specific_setup():
     """Extra safety and optimization for Kaggle P100 environment"""
     print("\n" + "="*70)
-    print("🔧 APPLYING KAGGLE-SPECIFIC OPTIMIZATIONS")
+    print("APPLYING KAGGLE-SPECIFIC OPTIMIZATIONS")
     print("="*70)
     
     # 1. Deterministic algorithms for reproducibility
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-    print("✅ Deterministic algorithms enabled (reproducible, prevents OOM crashes)")
+    print("Deterministic algorithms enabled (reproducible, prevents OOM crashes)")
     
     # 2. Limit CPU threads to prevent RAM OOM during data loading
     torch.set_num_threads(2)
-    print(f"✅ CPU threads limited to {torch.get_num_threads()} (prevents memory swapping)")
+    print(f"CPU threads limited to {torch.get_num_threads()} (prevents memory swapping)")
     
-    # 3. Check GPU and only enable TF32 if supported (P100 doesn't support it)
+    # 3. Check GPU and only enable TF32 if supported
     gpu_name = torch.cuda.get_device_name(0) if torch.cuda.is_available() else ""
     if "P100" in gpu_name:
-        print(f"⚠️  Tesla P100 detected - TF32 disabled (not supported on this GPU)")
+        print(f"Tesla P100 detected - TF32 disabled (not supported on this GPU)")
     else:
         # Enable TF32 for newer GPUs
         torch.backends.cuda.matmul.allow_tf32 = True
         torch.backends.cudnn.allow_tf32 = True
-        print("✅ TF32 enabled (faster math on compatible GPUs)")
+        print("TF32 enabled (faster math on compatible GPUs)")
     
     # 4. Force garbage collection before starting
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
         torch.cuda.synchronize()
-    print("✅ GPU cache cleared, memory fragmentation prevented")
+    print("GPU cache cleared, memory fragmentation prevented")
     
     # 5. Set random seeds for reproducibility
     torch.manual_seed(42)
     np.random.seed(42)
-    print("✅ Random seeds set (reproducible results)")
+    print("Random seeds set (reproducible results)")
     
     print("="*70 + "\n")
 
-# [Rest of the code remains exactly the same - all classes and functions below]
-# Only the imports and tensor_parallel mock at the top were changed
 
 # ========== MEMORY MONITOR ==========
 class MemoryMonitor:
@@ -249,7 +242,7 @@ class MemoryMonitor:
             log_entry["gpu_reserved_gb"] = round(reserved, 2)
             
             if allocated > 14:
-                print(f"⚠️  MEMORY WARNING: {allocated:.2f}GB GPU allocated (limit ~16GB)")
+                print(f"MEMORY WARNING: {allocated:.2f}GB GPU allocated (limit ~16GB)")
                 log_entry["warning"] = "High GPU memory"
         
         cpu_mem = psutil.virtual_memory()
@@ -261,13 +254,13 @@ class MemoryMonitor:
         log_entry["cpu_percent"] = round(cpu_percent, 2)
         
         if cpu_percent > 85:
-            print(f"⚠️  MEMORY WARNING: {cpu_percent:.1f}% CPU memory used")
+            print(f"MEMORY WARNING: {cpu_percent:.1f}% CPU memory used")
             log_entry["warning"] = "High CPU memory"
         
         self.memory_log.append(log_entry)
         
         if prefix:
-            print(f"  💾 {prefix}: GPU={log_entry.get('gpu_allocated_gb', 'N/A')}GB, "
+            print(f"{prefix}: GPU={log_entry.get('gpu_allocated_gb', 'N/A')}GB, "
                   f"CPU={log_entry.get('cpu_used_gb', 'N/A')}GB ({cpu_percent:.1f}%)")
     
     def get_report(self) -> Dict:
@@ -291,7 +284,7 @@ class CheckpointRecoveryManager:
         
         self.metadata = self._load_metadata()
         
-        print("✅ CheckpointRecoveryManager initialized")
+        print("CheckpointRecoveryManager initialized")
     
     def _load_metadata(self) -> Dict:
         """Load checkpoint metadata"""
@@ -300,7 +293,7 @@ class CheckpointRecoveryManager:
                 with open(self.checkpoint_metadata_file, "r", encoding="utf-8") as f:
                     return json.load(f)
             except Exception as e:
-                print(f"⚠️ Error loading metadata: {str(e)}")
+                print(f"Error loading metadata: {str(e)}")
                 return {}
         return {}
     
@@ -310,7 +303,7 @@ class CheckpointRecoveryManager:
             with open(self.checkpoint_metadata_file, "w", encoding="utf-8") as f:
                 json.dump(self.metadata, f, indent=2, ensure_ascii=False)
         except Exception as e:
-            print(f"⚠️ Error saving metadata: {str(e)}")
+            print(f"Error saving metadata: {str(e)}")
     
     def log_recovery(self, message: str):
         """Log recovery information"""
@@ -319,7 +312,7 @@ class CheckpointRecoveryManager:
                 timestamp = pd.Timestamp.now()
                 f.write(f"[{timestamp}] {message}\n")
         except Exception as e:
-            print(f"⚠️ Error logging: {str(e)}")
+            print(f"Error logging: {str(e)}")
     
     def find_latest_checkpoint(self) -> Optional[Path]:
         """Find the latest checkpoint directory"""
@@ -333,11 +326,11 @@ class CheckpointRecoveryManager:
             if checkpoint_dirs:
                 latest = checkpoint_dirs[0]
                 step = int(latest.name.split("-")[1])
-                print(f"✅ Found latest checkpoint: {latest.name} (Step {step})")
+                print(f"Found latest checkpoint: {latest.name} (Step {step})")
                 self.log_recovery(f"Found checkpoint: {latest.name}")
                 return latest
         except Exception as e:
-            print(f"⚠️ Error finding checkpoint: {str(e)}")
+            print(f"Error finding checkpoint: {str(e)}")
         
         return None
     
@@ -386,12 +379,12 @@ class CheckpointRecoveryManager:
                     try:
                         import shutil
                         shutil.rmtree(checkpoint_dir)
-                        print(f"🗑️ Removed old checkpoint: {checkpoint_dir.name}")
+                        print(f"Removed old checkpoint: {checkpoint_dir.name}")
                         self.log_recovery(f"Removed old checkpoint: {checkpoint_dir.name}")
                     except Exception as e:
-                        print(f"⚠️ Error removing checkpoint: {str(e)}")
+                        print(f"Error removing checkpoint: {str(e)}")
         except Exception as e:
-            print(f"⚠️ Error in cleanup: {str(e)}")
+            print(f"Error in cleanup: {str(e)}")
 
 # ========== SWAHILI SCORE EARLY STOPPING ==========
 class SwahiliScoreEarlyStopping(EarlyStoppingCallback):
@@ -433,21 +426,21 @@ class SwahiliScoreEarlyStopping(EarlyStoppingCallback):
             else:
                 avg_score = np.mean(self.swahili_scores)
             
-            print(f"\n📊 Swahili Score Monitor (Eval #{self.eval_count}):")
+            print(f"\nSwahili Score Monitor (Eval #{self.eval_count}):")
             print(f"   Current: {current_score:.4f} | Windowed Avg: {avg_score:.4f}")
             
             if avg_score > self.best_score + self.threshold:
                 self.best_score = avg_score
                 self.patience_counter = 0
-                print(f"   ✅ New best Swahili score: {self.best_score:.4f} (Reset patience)")
+                print(f"   New best Swahili score: {self.best_score:.4f} (Reset patience)")
             else:
                 self.patience_counter += 1
                 improvement_needed = (self.best_score + self.threshold - avg_score)
-                print(f"   ⚠️  No improvement. Patience: {self.patience_counter}/{self.early_stopping_patience}")
+                print(f"   No improvement. Patience: {self.patience_counter}/{self.early_stopping_patience}")
                 print(f"   Need +{improvement_needed:.4f} to reset")
             
             if self.patience_counter >= self.early_stopping_patience:
-                print(f"\n🛑 SWAHILI EARLY STOPPING TRIGGERED!")
+                print(f"\n SWAHILI EARLY STOPPING TRIGGERED!")
                 print(f"   Swahili quality plateaued at {self.best_score:.4f}")
                 print(f"   Stopping training...")
                 control.should_training_stop = True
@@ -472,10 +465,10 @@ class TrackingConfig:
     TEST_PROMPTS: List[str] = field(default_factory=lambda: [
         "Habari za asubuhi? Leo ni siku nzuri ya",
         "Mimi ni mwalimu wa shule ya msingi. Ninafundisha",
-        "Nchini Tanzania, kilimo ni sekta muhimu. Wananchi",
+        "Nchini Kenya, kilimo ni sekta muhimu. Wananchi",
         "Siku moja, mtoto alikuwa akitembea porini na",
-        "Kiswahili ni lugha ya Kiafrika inayozungumzwa",
-        "Elimu ni muhimu sana. Kwa hiyo, wazazi wanafanya",
+        "Kiswahili ni lugha ya afrika inayozungumzwa",
+        "Elimu ni muhimu sana. Kwa hivyo, wazazi wanafanya",
     ])
     
     METRICS_DIR: str = "/kaggle/working/metrics"
@@ -500,21 +493,21 @@ class TrainingConfig:
     TEXT_FIELD: str = "text"
     TOKENIZED_DATA_PATH: str = "/kaggle/working/tokenized_packed"
     
-    MAX_LENGTH: int = 512  # REDUCED from 2048
+    MAX_LENGTH: int = 512 
     USE_SEQUENCE_PACKING: bool = True
     
     EPOCHS: int = 0.5
-    BATCH_SIZE: int = 2  # REDUCED from 4
-    GRADIENT_ACCUMULATION_STEPS: int = 16  # INCREASED from 8
+    BATCH_SIZE: int = 2  
+    GRADIENT_ACCUMULATION_STEPS: int = 16 
     LEARNING_RATE: float = 5e-5
     WARMUP_RATIO: float = 0.1
     WEIGHT_DECAY: float = 0.01
     
-    LORA_R: int = 16  # REDUCED from 32
-    LORA_ALPHA: int = 32  # REDUCED from 64
+    LORA_R: int = 16 
+    LORA_ALPHA: int = 32  
     LORA_DROPOUT: float = 0.05
     
-    LOAD_IN_4BIT: bool = True  # MAKE SURE THIS IS TRUE
+    LOAD_IN_4BIT: bool = True  
     BNB_4BIT_COMPUTE_DTYPE: str = "bfloat16"
     
     OUTPUT_DIR: str = "/kaggle/working/swahili-linguistic-foundation"
@@ -542,7 +535,7 @@ class SequencePacker:
         max_length: int = 512,
     ) -> Dict:
         """Tokenize texts with sequence packing"""
-        print("📦 Tokenizing with sequence packing...")
+        print("Tokenizing with sequence packing...")
         
         all_token_ids = []
         
@@ -582,7 +575,7 @@ class SequencePacker:
         
         labels = packed_input_ids.copy()
         
-        print(f"  ✅ Created {len(packed_input_ids)} packed sequences")
+        print(f"   Created {len(packed_input_ids)} packed sequences")
         print(f"     Efficiency: {len(all_token_ids) / (len(packed_input_ids) * max_length) * 100:.1f}% token utilization")
         
         return {
@@ -618,7 +611,7 @@ class MetricsTracker:
         
         self._load_previous_metrics()
         
-        print("✅ MetricsTracker initialized")
+        print(" MetricsTracker initialized")
     
     def _load_previous_metrics(self):
         """Load metrics from previous training run"""
@@ -626,9 +619,9 @@ class MetricsTracker:
             try:
                 with open(self.metrics_file, "r", encoding="utf-8") as f:
                     self.metrics_history = json.load(f)
-                print(f"✅ Loaded {len(self.metrics_history)} previous metrics")
+                print(f" Loaded {len(self.metrics_history)} previous metrics")
             except Exception as e:
-                print(f"⚠️ Could not load previous metrics: {str(e)}")
+                print(f" Could not load previous metrics: {str(e)}")
         
     def compute_auto_metrics(self, eval_pred, model=None) -> Dict:
         """Compute all automatic metrics from evaluation predictions"""
@@ -680,7 +673,7 @@ class MetricsTracker:
             }
             
         except Exception as e:
-            print(f"❌ Error in compute_auto_metrics: {str(e)}")
+            print(f" Error in compute_auto_metrics: {str(e)}")
             return self._empty_metrics()
     
     def _empty_metrics(self) -> Dict:
@@ -718,13 +711,13 @@ class MetricsTracker:
                 stability_metrics["learning_rate"] = float(logs["learning_rate"])
             
         except Exception as e:
-            print(f"⚠️ Warning in track_training_stability: {str(e)}")
+            print(f" Warning in track_training_stability: {str(e)}")
         
         return stability_metrics
     
     def generate_completions(self, model, step: int) -> Dict:
         """Generate completions for test prompts"""
-        print(f"\n📝 Generating completions at step {step}...")
+        print(f"\n Generating completions at step {step}...")
         
         completions = {}
         model.eval()
@@ -786,12 +779,12 @@ class MetricsTracker:
             return summary
             
         except Exception as e:
-            print(f"❌ Error generating completions: {str(e)}")
+            print(f" Error generating completions: {str(e)}")
             return {"avg_swahili_score": 0, "avg_completion_length": 0, "avg_coherence": 0}
     
     def analyze_language_consistency(self, model, dataset_sample) -> Dict:
         """Analyze language consistency"""
-        print("\n🔍 Analyzing language consistency...")
+        print("\n Analyzing language consistency...")
         
         model.eval()
         predictions = []
@@ -835,7 +828,7 @@ class MetricsTracker:
     
     def analyze_vocab_coverage(self, model, dataset_sample) -> Dict:
         """Analyze vocabulary coverage"""
-        print("\n📊 Analyzing vocabulary coverage...")
+        print("\n Analyzing vocabulary coverage...")
         
         vocab_size = len(self.tokenizer)
         model.eval()
@@ -875,7 +868,7 @@ class MetricsTracker:
             return metrics
             
         except Exception as e:
-            print(f"❌ Error analyzing vocab coverage: {str(e)}")
+            print(f" Error analyzing vocab coverage: {str(e)}")
             return {"vocab_coverage": 0, "unique_tokens_used": 0, "total_vocab_size": vocab_size, "most_common_tokens": []}
     
     def _compute_swahili_score(self, text: str) -> float:
@@ -926,11 +919,11 @@ class MetricsTracker:
             df.to_csv(csv_file, index=False)
             
         except Exception as e:
-            print(f"⚠️ Warning saving metrics: {str(e)}")
+            print(f" Warning saving metrics: {str(e)}")
     
     def generate_plots(self):
         """Generate comprehensive visualization plots"""
-        print("\n📊 Generating plots...")
+        print("\n Generating plots...")
         
         if not self.metrics_history:
             print("  No metrics to plot yet")
@@ -1040,12 +1033,12 @@ class MetricsTracker:
             print("  ✓ Saved: metrics_dashboard.png")
             
         except Exception as e:
-            print(f"❌ Error generating plots: {str(e)}")
+            print(f" Error generating plots: {str(e)}")
     
     def generate_report(self):
         """Generate comprehensive training report"""
         print("\n" + "="*70)
-        print("📊 COMPREHENSIVE TRAINING REPORT")
+        print(" COMPREHENSIVE TRAINING REPORT")
         print("="*70)
         
         if not self.metrics_history:
@@ -1057,7 +1050,7 @@ class MetricsTracker:
         auto_metrics = df[df["type"] == "auto"]
         manual_metrics = df[df["type"] == "manual"]
         
-        print("\n📈 AUTO METRICS (Every evaluation):")
+        print("\n AUTO METRICS (Every evaluation):")
         if not auto_metrics.empty:
             latest_auto = auto_metrics.iloc[-1]
             for metric in ["perplexity", "token_accuracy", "entropy", "bpc", "loss"]:
@@ -1066,7 +1059,7 @@ class MetricsTracker:
                     if pd.notna(val):
                         print(f"  {metric:20}: {val:.4f}")
         
-        print("\n📝 MANUAL METRICS (Periodic):")
+        print("\n MANUAL METRICS (Periodic):")
         if not manual_metrics.empty:
             latest_manual = manual_metrics.iloc[-1]
             for metric in ["language_consistency", "vocab_coverage", "avg_swahili_score"]:
@@ -1076,10 +1069,10 @@ class MetricsTracker:
                         print(f"  {metric:20}: {val:.4f}")
         
         if self.swahili_score_history:
-            print(f"\n🌟 SWAHILI SCORE HISTORY:")
+            print(f"\n SWAHILI SCORE HISTORY:")
             print(f"  Peak score: {max(self.swahili_score_history):.4f}")
             print(f"  Current score: {self.swahili_score_history[-1]:.4f}")
-            print(f"  Trend: {'📈 Improving' if self.swahili_score_history[-1] > np.mean(self.swahili_score_history[:-1]) else '📉 Plateauing'}")
+            print(f"  Trend: {' Improving' if self.swahili_score_history[-1] > np.mean(self.swahili_score_history[:-1]) else '📉 Plateauing'}")
         
         print("\n" + "="*70)
 
@@ -1178,9 +1171,9 @@ class ComprehensiveMetricsCallback(TrainerCallback):
                     "attention_mask": torch.tensor([s["attention_mask"] for s in sample]),
                 }
                 
-                print(f"✅ Cached dataset sample: {sample_size} examples")
+                print(f" Cached dataset sample: {sample_size} examples")
         except Exception as e:
-            print(f"⚠️ Error caching sample: {str(e)}")
+            print(f" Error caching sample: {str(e)}")
 
 # ========== JSONL DATASET LOADING WITH SEQUENCE PACKING ==========
 def load_jsonl_dataset_with_packing(
@@ -1193,7 +1186,7 @@ def load_jsonl_dataset_with_packing(
     max_samples: Optional[int] = None
 ) -> datasets.DatasetDict:
     """Load JSONL dataset with optional sequence packing"""
-    print("📦 Loading JSONL dataset...")
+    print(" Loading JSONL dataset...")
     
     data_path = Path(data_path)
     texts = []
@@ -1227,13 +1220,13 @@ def load_jsonl_dataset_with_packing(
     if not texts:
         raise ValueError("No valid text data found")
     
-    print(f"\n✅ Total texts loaded: {len(texts):,}")
+    print(f"\n Total texts loaded: {len(texts):,}")
     
     if use_packing:
-        print("\n📦 Using sequence packing for efficiency...")
+        print("\n Using sequence packing for efficiency...")
         encodings = SequencePacker.tokenize_with_packing(texts, tokenizer, max_length)
     else:
-        print("\n📦 Using standard padding...")
+        print("\n Using standard padding...")
         toks = tokenizer(
             texts,
             truncation=True,
@@ -1255,7 +1248,7 @@ def load_jsonl_dataset_with_packing(
         "labels": encodings["labels"],
     })
     
-    print(f"✅ Dataset created: {len(dataset):,} examples")
+    print(f" Dataset created: {len(dataset):,} examples")
     
     dataset = dataset.train_test_split(test_size=test_size, seed=42)
     
@@ -1267,23 +1260,23 @@ def load_jsonl_dataset_with_packing(
 def setup_environment():
     """Setup environment and print system info"""
     print("=" * 70)
-    print("🚀 SWAHILI LINGUISTIC FOUNDATION - KAGGLE OPTIMIZED VERSION")
+    print(" SWAHILI LINGUISTIC FOUNDATION - KAGGLE OPTIMIZED VERSION")
     print("=" * 70)
     
     if torch.cuda.is_available():
-        print(f"✅ GPU: {torch.cuda.get_device_name(0)}")
-        print(f"💾 GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
+        print(f" GPU: {torch.cuda.get_device_name(0)}")
+        print(f" GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
     else:
-        print("⚠️ No GPU available")
+        print(" No GPU available")
     
-    print(f"🖥️ CPU Cores: {psutil.cpu_count()}")
-    print(f"📊 RAM: {psutil.virtual_memory().total / 1e9:.1f} GB")
+    print(f" CPU Cores: {psutil.cpu_count()}")
+    print(f" RAM: {psutil.virtual_memory().total / 1e9:.1f} GB")
     print("-" * 70)
 
 def main():
     """Main training function"""
     
-    # ✅ CRITICAL: Call Kaggle setup FIRST
+    #   Kaggle setup 
     kaggle_specific_setup()
     
     train_config = TrainingConfig()
@@ -1298,31 +1291,31 @@ def main():
     memory_monitor = MemoryMonitor()
     
     print("\n" + "="*70)
-    print("🔄 CHECKPOINT RECOVERY CHECK")
+    print(" CHECKPOINT RECOVERY CHECK")
     print("="*70)
     
     recovery_state = checkpoint_manager.get_recovery_state()
     
     if recovery_state["found"]:
-        print(f"✅ Found checkpoint: {recovery_state['checkpoint_path']}")
+        print(f" Found checkpoint: {recovery_state['checkpoint_path']}")
         print(f"   Step: {recovery_state['metadata'].get('step', 'unknown')}")
     else:
-        print("✅ No previous checkpoint - starting fresh")
+        print(" No previous checkpoint - starting fresh")
     
     print("-" * 70 + "\n")
     
     # Load tokenizer
-    print("🔧 Loading tokenizer...")
+    print(" Loading tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained(train_config.MODEL_ID)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
-    print(f"✅ Tokenizer loaded. Vocab size: {len(tokenizer):,}")
+    print(f" Tokenizer loaded. Vocab size: {len(tokenizer):,}")
     
     # Initialize tracker
     tracker = MetricsTracker(track_config, tokenizer)
     
     # Load model
-    print("\n🤖 Loading model...")
+    print("\n Loading model...")
     bnb_config = BitsAndBytesConfig(
         load_in_4bit=True,
         bnb_4bit_compute_dtype=torch.bfloat16,
@@ -1337,7 +1330,7 @@ def main():
         torch_dtype=torch.bfloat16,
         low_cpu_mem_usage=True,
     )
-    print("✅ Model loaded with 4-bit quantization")
+    print(" Model loaded with 4-bit quantization")
     
     model = prepare_model_for_kbit_training(model)
     
@@ -1352,10 +1345,10 @@ def main():
     
     model = get_peft_model(model, lora_config)
     model.gradient_checkpointing_enable()
-    print(f"✅ LoRA configured")
+    print(f" LoRA configured")
     
     # Load dataset with packing
-    print("\n📂 Loading dataset...")
+    print("\n Loading dataset...")
     dataset = load_jsonl_dataset_with_packing(
         tokenizer,
         train_config.DATA_PATH,
@@ -1400,7 +1393,7 @@ def main():
         pad_to_multiple_of=8,
     )
     
-    # ✅ Callbacks with Swahili early stopping
+    #  Callbacks with Swahili early stopping
     callbacks = [
         ComprehensiveMetricsCallback(tracker, track_config, checkpoint_manager, memory_monitor),
         EarlyStoppingCallback(early_stopping_patience=3, early_stopping_threshold=0.001),
@@ -1428,9 +1421,9 @@ def main():
     
     # Train
     print("\n" + "="*70)
-    print("🚀 STARTING TRAINING - KAGGLE OPTIMIZED VERSION")
+    print(" STARTING TRAINING - KAGGLE OPTIMIZED VERSION")
     print("="*70)
-    print("✅ ALL FEATURES ENABLED:")
+    print(" ALL FEATURES ENABLED:")
     print("   ✓ Kaggle P100 Optimizations")
     print("   ✓ Sequence Packing (20-30% efficiency)")
     print("   ✓ Memory Monitoring")
@@ -1446,12 +1439,12 @@ def main():
     trainer.train(resume_from_checkpoint=resume_from)
     
     # Save
-    print("\n💾 Saving model...")
+    print("\n Saving model...")
     trainer.save_model()
     tokenizer.save_pretrained(train_config.OUTPUT_DIR)
     
     # Final eval
-    print("\n📊 Final evaluation...")
+    print("\n Final evaluation...")
     final_metrics = trainer.evaluate()
     
     # Report
@@ -1479,25 +1472,25 @@ def main():
         json.dump(final_summary, f, indent=2, ensure_ascii=False)
     
     print("\n" + "=" * 70)
-    print("🎉 TRAINING COMPLETE!")
+    print(" TRAINING COMPLETE!")
     print("=" * 70)
-    print(f"✅ Final Perplexity: {final_summary['final_perplexity']:.2f}")
-    print(f"✅ Total Steps: {final_summary['training_steps']:,}")
-    print(f"✅ Peak GPU Memory: {memory_report['peak_gpu_memory_gb']}GB")
-    print(f"✅ Peak CPU Memory: {memory_report['peak_cpu_memory_gb']}GB")
+    print(f" Final Perplexity: {final_summary['final_perplexity']:.2f}")
+    print(f" Total Steps: {final_summary['training_steps']:,}")
+    print(f" Peak GPU Memory: {memory_report['peak_gpu_memory_gb']}GB")
+    print(f" Peak CPU Memory: {memory_report['peak_cpu_memory_gb']}GB")
     
     if tracker.swahili_score_history:
-        print(f"✅ Peak Swahili Score: {max(tracker.swahili_score_history):.3f}")
-        print(f"✅ Final Swahili Score: {tracker.swahili_score_history[-1]:.3f}")
+        print(f" Peak Swahili Score: {max(tracker.swahili_score_history):.3f}")
+        print(f" Final Swahili Score: {tracker.swahili_score_history[-1]:.3f}")
     
-    print(f"\n📁 Outputs saved to:")
-    print(f"   📂 Model: {train_config.OUTPUT_DIR}")
-    print(f"   📊 Metrics: {track_config.METRICS_DIR}")
-    print(f"   📈 Plots: {track_config.PLOTS_DIR}")
-    print(f"   📝 Completions: {track_config.COMPLETIONS_DIR}")
-    print(f"   🔄 Checkpoints: {track_config.CHECKPOINTS_DIR}")
+    print(f"\n Outputs saved to:")
+    print(f"    Model: {train_config.OUTPUT_DIR}")
+    print(f"    Metrics: {track_config.METRICS_DIR}")
+    print(f"    Plots: {track_config.PLOTS_DIR}")
+    print(f"    Completions: {track_config.COMPLETIONS_DIR}")
+    print(f"    Checkpoints: {track_config.CHECKPOINTS_DIR}")
     
-    print(f"\n📋 Files generated:")
+    print(f"\n Files generated:")
     print(f"   - training_summary.json")
     print(f"   - metrics_history.json")
     print(f"   - metrics.csv")
@@ -1505,7 +1498,7 @@ def main():
     print(f"   - checkpoint_metadata.json")
     print(f"   - recovery.log")
     print(f"   - 6+ detailed plots (PNG)")
-    print(f"\n🎯 Ready for Stage 2: Conversation Fine-tuning!")
+    print(f"\n Ready for Stage 2: Conversation Fine-tuning!")
     print("=" * 70)
     
     return trainer, tracker, checkpoint_manager, memory_monitor
