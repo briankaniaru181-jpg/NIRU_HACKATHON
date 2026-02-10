@@ -1,0 +1,184 @@
+[
+  {
+    "step": 50,
+    "epoch": 0,
+    "type": "stability",
+    "timestamp": "2026-02-09 12:14:36.801496",
+    "grad_norm": 0.8230869174003601,
+    "learning_rate": 4.803921568627452e-05
+  },
+  {
+    "step": 100,
+    "epoch": 0,
+    "type": "stability",
+    "timestamp": "2026-02-09 12:33:44.853356",
+    "loss_std": 0,
+    "grad_norm": 0.5352001190185547,
+    "learning_rate": 4.863952500912159e-05
+  },
+  {
+    "step": 100,
+    "epoch": 0.09883254061399716,
+    "type": "auto",
+    "timestamp": "2026-02-09 12:48:45.494875",
+    "loss": 2.5803072452545166,
+    "perplexity": 13.2011935406975
+  },
+  {
+    "step": 100,
+    "epoch": 0,
+    "type": "completions",
+    "timestamp": "2026-02-09 12:49:16.220206",
+    "avg_swahili_score": 0.9656084656084656,
+    "avg_completion_length": 21.5,
+    "avg_coherence": 0.0729983660130719
+  },
+  {
+    "step": 150,
+    "epoch": 0,
+    "type": "stability",
+    "timestamp": "2026-02-09 13:08:26.132849",
+    "loss_std": 0,
+    "grad_norm": 0.45577743649482727,
+    "learning_rate": 4.449185885158056e-05
+  },
+  {
+    "step": 200,
+    "epoch": 0,
+    "type": "stability",
+    "timestamp": "2026-02-09 13:27:34.340942",
+    "loss_std": 0,
+    "grad_norm": 0.5083117485046387,
+    "learning_rate": 3.8044061946861795e-05
+  },
+  {
+    "step": 200,
+    "epoch": 0.1976650812279943,
+    "type": "auto",
+    "timestamp": "2026-02-09 13:42:35.147920",
+    "loss": 2.5001296997070312,
+    "perplexity": 12.18407412907256
+  },
+  {
+    "step": 200,
+    "epoch": 0,
+    "type": "completions",
+    "timestamp": "2026-02-09 13:42:59.508850",
+    "avg_swahili_score": 1.0,
+    "avg_completion_length": 18.333333333333332,
+    "avg_coherence": 0.04403011204481793
+  },
+  {
+    "step": 250,
+    "epoch": 0,
+    "type": "stability",
+    "timestamp": "2026-02-09 14:02:08.449775",
+    "loss_std": 0,
+    "grad_norm": 0.46164366602897644,
+    "learning_rate": 3.0057004565216522e-05
+  },
+  {
+    "step": 300,
+    "epoch": 0,
+    "type": "stability",
+    "timestamp": "2026-02-09 14:21:15.955126",
+    "loss_std": 0,
+    "grad_norm": 0.6186068654060364,
+    "learning_rate": 2.1473196931189372e-05
+  },
+  {
+    "step": 300,
+    "epoch": 0.29649762184199147,
+    "type": "auto",
+    "timestamp": "2026-02-09 14:36:17.111839",
+    "loss": 2.4634807109832764,
+    "perplexity": 11.74562359234035
+  },
+  {
+    "step": 300,
+    "epoch": 0,
+    "type": "completions",
+    "timestamp": "2026-02-09 14:36:47.266880",
+    "avg_swahili_score": 0.9656084656084656,
+    "avg_completion_length": 23.5,
+    "avg_coherence": 0.06914682539682539
+  },
+  {
+    "step": 350,
+    "epoch": 0,
+    "type": "stability",
+    "timestamp": "2026-02-09 14:55:54.435992",
+    "loss_std": 0,
+    "grad_norm": 0.5005990266799927,
+    "learning_rate": 1.33055685974322e-05
+  },
+  {
+    "step": 400,
+    "epoch": 0,
+    "type": "stability",
+    "timestamp": "2026-02-09 15:15:00.578598",
+    "loss_std": 0,
+    "grad_norm": 0.5097547173500061,
+    "learning_rate": 6.517938007585747e-06
+  },
+  {
+    "step": 400,
+    "epoch": 0.3953301624559886,
+    "type": "auto",
+    "timestamp": "2026-02-09 15:30:00.937817",
+    "loss": 2.449958562850952,
+    "perplexity": 11.58786654112184
+  },
+  {
+    "step": 400,
+    "epoch": 0,
+    "type": "completions",
+    "timestamp": "2026-02-09 15:30:30.772996",
+    "avg_swahili_score": 1.0,
+    "avg_completion_length": 22.166666666666668,
+    "avg_coherence": 0.052859477124183006
+  },
+  {
+    "step": 450,
+    "epoch": 0,
+    "type": "stability",
+    "timestamp": "2026-02-09 15:49:38.497923",
+    "loss_std": 0,
+    "grad_norm": 0.4966485798358917,
+    "learning_rate": 1.9112774003199802e-06
+  },
+  {
+    "step": 500,
+    "epoch": 0,
+    "type": "stability",
+    "timestamp": "2026-02-09 16:08:45.050378",
+    "loss_std": 0,
+    "grad_norm": 0.4869500994682312,
+    "learning_rate": 2.919432919183396e-08
+  },
+  {
+    "step": 500,
+    "epoch": 0.4941627030699858,
+    "type": "auto",
+    "timestamp": "2026-02-09 16:23:45.941116",
+    "loss": 2.4477927684783936,
+    "perplexity": 11.562796762769052
+  },
+  {
+    "step": 500,
+    "epoch": 0,
+    "type": "completions",
+    "timestamp": "2026-02-09 16:24:16.232497",
+    "avg_swahili_score": 1.0,
+    "avg_completion_length": 21.833333333333332,
+    "avg_coherence": 0.06337535014005602
+  },
+  {
+    "step": 500,
+    "epoch": 0.4941627030699858,
+    "type": "auto",
+    "timestamp": "2026-02-09 16:39:19.144335",
+    "loss": 2.4477927684783936,
+    "perplexity": 11.562796762769052
+  }
+]
