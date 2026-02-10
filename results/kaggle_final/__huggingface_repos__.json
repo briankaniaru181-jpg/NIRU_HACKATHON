@@ -1,0 +1,1 @@
+{"repos": [{"repoId": "CraneAILabs/swahili-gemma-1b", "repoType": "model", "commitHash": "ac79fd9b8d93c71ee9e6f6bc04ad4c899e5e2260", "filePaths": ["generation_config.json", "tokenizer.json", "special_tokens_map.json", "added_tokens.json", "config.json", "chat_template.jinja", "model.safetensors", "tokenizer_config.json"]}]}

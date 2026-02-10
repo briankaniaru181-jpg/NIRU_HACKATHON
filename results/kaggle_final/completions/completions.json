@@ -1,0 +1,212 @@
+[
+  {
+    "step": 100,
+    "timestamp": "2026-02-09 12:49:16.219361",
+    "completions": {
+      "Habari za asubuhi? Leo ni siku nzuri ya": {
+        "completion": "kutazama michezo.\nUnaweza kushiriki namba ya simu ya Dkt. Eruwa?\nDkt. Eruwa: Namba ya simu ya Dkt. Eruwa ni 09",
+        "length": 20,
+        "swahili_score": 1.0,
+        "coherence": 0.0625
+      },
+      "Mimi ni mwalimu wa shule ya msingi. Nina": {
+        "completion": "lugha ya Kiingereza na sasa nimebobea lugha ya Kirusi.\n1. Andika matokeo ya makala ya utafiti kuhusu \"Umuhimu wa kutoa taarifa za",
+        "length": 22,
+        "swahili_score": 1.0,
+        "coherence": 0.06666666666666667
+      },
+      "Nchini Tanzania, kilimo ni sekta muhimu.": {
+        "completion": "wengi wamekuwa wakulima kwa miaka mingi.\nMnamo mwaka wa 2017, wengi walishangaa na kuchanganyikiwa kuhusu vitu vinavyoenda kukua. Wal",
+        "length": 19,
+        "swahili_score": 1.0,
+        "coherence": 0.0
+      },
+      "Siku moja, mtoto alikuwa akitembea porin": {
+        "completion": "kumwona mbwa mwenye rangi ya bluu aliyeketi peke yake. Alipojaribu kumkaribia mbwa, mtoto alipata jeraha kubwa. Akiwa amekata tamaa na hatimaye",
+        "length": 21,
+        "swahili_score": 0.7936507936507937,
+        "coherence": 0.0
+      },
+      "Kiswahili ni lugha ya Kiafrika inayozung": {
+        "completion": "na mamilioni ya watu. Kwa kawaida, lugha ya Kiswahili hutumika katika nchi za Afrika.\nKwa maelezo zaidi, tafadhali wasiliana na mtaalamu wa lugha au mtaalam wa",
+        "length": 26,
+        "swahili_score": 1.0,
+        "coherence": 0.25
+      },
+      "Elimu ni muhimu sana. Kwa hiyo, wazazi w": {
+        "completion": "nini na watoto wao?\nChagua jibu sahihi kutoka kwa majibu yafuatayo:\nA. Wanafunza watoto wao kucheza na kucheza nje.\nB. Wanajaribu",
+        "length": 21,
+        "swahili_score": 1.0,
+        "coherence": 0.058823529411764705
+      }
+    }
+  },
+  {
+    "step": 200,
+    "timestamp": "2026-02-09 13:42:59.507751",
+    "completions": {
+      "Habari za asubuhi? Leo ni siku nzuri ya": {
+        "completion": "kuwa na nguo yako ya kilele, vipi kuhusu wewe?",
+        "length": 9,
+        "swahili_score": 1.0,
+        "coherence": 0.0625
+      },
+      "Mimi ni mwalimu wa shule ya msingi. Nina": {
+        "completion": "darasani, na ninapokuwa nikiandaa madarasa yangu, ninasoma kila siku. Ninajaribu kukumbuka kila kitu ninachojifunza. Ninapokutana na wazazi w",
+        "length": 18,
+        "swahili_score": 1.0,
+        "coherence": 0.0
+      },
+      "Nchini Tanzania, kilimo ni sekta muhimu.": {
+        "completion": "wengi hutumia shamba kuwapa wazazi wao chakula cha mwisho cha mwaka. Watu wengi hupata pesa zinazohitajika kwa gharama ya chakula.\nWatu wengi katika jamii",
+        "length": 24,
+        "swahili_score": 1.0,
+        "coherence": 0.0
+      },
+      "Siku moja, mtoto alikuwa akitembea porin": {
+        "completion": "akakutana na ulimwengu wa kupendeza wa wanyama. Kila mnyama alikuwa na tabia yake ya kipekee.\n\nMimi, nilikuwa nikienda kutazama ndege",
+        "length": 20,
+        "swahili_score": 1.0,
+        "coherence": 0.14285714285714285
+      },
+      "Kiswahili ni lugha ya Kiafrika inayozung": {
+        "completion": "na wasemaji wengi sana katika Afrika magharibi na Afrika Kaskazini. Kiswahili ni lugha ya kwanza katika orodha ya lugha za Ulaya na Asia. Kulingana na Shirika la Elimu ya",
+        "length": 29,
+        "swahili_score": 1.0,
+        "coherence": 0.0
+      },
+      "Elimu ni muhimu sana. Kwa hiyo, wazazi w": {
+        "completion": "nini ili kuhakikisha wanafunzi wao wamekuwa na elimu ya kutosha?",
+        "length": 10,
+        "swahili_score": 1.0,
+        "coherence": 0.058823529411764705
+      }
+    }
+  },
+  {
+    "step": 300,
+    "timestamp": "2026-02-09 14:36:47.265745",
+    "completions": {
+      "Habari za asubuhi? Leo ni siku nzuri ya": {
+        "completion": "kutumia siku ya uzinduzi wa chapa ya mitindo ya \"Nao\" (Nao Fashion). Hapa kuna habari muhimu:\n1. Siku ya kuzindua chapa mpya ya mitindo \"Nao Fashion",
+        "length": 26,
+        "swahili_score": 1.0,
+        "coherence": 0.14285714285714285
+      },
+      "Mimi ni mwalimu wa shule ya msingi. Nina": {
+        "completion": "historia ya Ugiriki.\nKuna mada 5 za kusoma historia ya Ugiriki, ambazo ni:\n• Muongo wa Umoja wa Kigiriki (Unyakua wa Ugiriki, 80",
+        "length": 23,
+        "swahili_score": 1.0,
+        "coherence": 0.06666666666666667
+      },
+      "Nchini Tanzania, kilimo ni sekta muhimu.": {
+        "completion": "wengi wamejiunga nayo. Kulingana na data ya sensa ya mwaka 2012, takriban 20% ya watu wa Tanzania wamejiunga na kilimo. Hii ni sawa na 2",
+        "length": 25,
+        "swahili_score": 1.0,
+        "coherence": 0.0
+      },
+      "Siku moja, mtoto alikuwa akitembea porin": {
+        "completion": "alipokuwa akitazama angani aliona tu majani mabichi na matuta ya mbao. Alifurahi sana. Lakini siku iliyofuata, alipoanza kutembea kwenye mchanga alik",
+        "length": 21,
+        "swahili_score": 0.7936507936507937,
+        "coherence": 0.0625
+      },
+      "Kiswahili ni lugha ya Kiafrika inayozung": {
+        "completion": "na Waiswahili wengi nchini Kenya. Kwa sasa, Kiswahili ndio lugha rasmi ya nchi hiyo.\nKwa mujibu wa sensa iliyofanyika mwaka wa 2022, watu",
+        "length": 23,
+        "swahili_score": 1.0,
+        "coherence": 0.14285714285714285
+      },
+      "Elimu ni muhimu sana. Kwa hiyo, wazazi w": {
+        "completion": "nini ili kuhakikisha kwamba watoto wao watajifunza na kuwa na elimu ya juu?\nWazazi huhamasisha watoto wao na wanafunzi wao kushiriki katika masomo",
+        "length": 23,
+        "swahili_score": 1.0,
+        "coherence": 0.0
+      }
+    }
+  },
+  {
+    "step": 400,
+    "timestamp": "2026-02-09 15:30:30.771879",
+    "completions": {
+      "Habari za asubuhi? Leo ni siku nzuri ya": {
+        "completion": "kazi, na nina hamu ya kuishia kwa siku.\nJibu: 2024-10-20 10:27 PM\n\nHabari za asubuhi!\nHabari za asubu",
+        "length": 18,
+        "swahili_score": 1.0,
+        "coherence": 0.058823529411764705
+      },
+      "Mimi ni mwalimu wa shule ya msingi. Nina": {
+        "completion": "darasa la 2 na la 3.\nTangu nilipoanza kufundisha, nilijifunza jinsi ya kuongeza nyakati za kujifunza kwa wanafunzi.\nMimi huwapa wana",
+        "length": 21,
+        "swahili_score": 1.0,
+        "coherence": 0.0
+      },
+      "Nchini Tanzania, kilimo ni sekta muhimu.": {
+        "completion": "wanatumia mbegu za mizeituni na nafaka nyingi kwa ajili ya kilimo.\nKichwa: \"Jinsi ya Kuandaa Chakula cha Kiasili cha Tanzania\"\nMuhtasari: Katika mak",
+        "length": 23,
+        "swahili_score": 1.0,
+        "coherence": 0.0
+      },
+      "Siku moja, mtoto alikuwa akitembea porin": {
+        "completion": "alikutana na mbwa mweupe. Alipomkaribia, aliona kuwa mbwa huyo ni mnyama mwitu. Kwa hofu, mtoto alikimbilia nyumbani kwake, akalalamika",
+        "length": 19,
+        "swahili_score": 1.0,
+        "coherence": 0.06666666666666667
+      },
+      "Kiswahili ni lugha ya Kiafrika inayozung": {
+        "completion": "zaidi na watu wa Kiswahili katika Afrika Magharibi. Kwa kawaida inatafsiriwa kama Kiswahili cha Afrika. \nKizazi cha saba cha Kiswahili kimepewa sifa ya kuwa lugha ya",
+        "length": 26,
+        "swahili_score": 1.0,
+        "coherence": 0.06666666666666667
+      },
+      "Elimu ni muhimu sana. Kwa hiyo, wazazi w": {
+        "completion": "nini na wanafunzi wao?\n\nHii ni swali ambalo wazazi wa watoto wao wanawaza sana. Wanaweza kuwa na wasiwasi kuhusu ni nini cha kufanya na wanafunzi w",
+        "length": 26,
+        "swahili_score": 1.0,
+        "coherence": 0.125
+      }
+    }
+  },
+  {
+    "step": 500,
+    "timestamp": "2026-02-09 16:24:16.231275",
+    "completions": {
+      "Habari za asubuhi? Leo ni siku nzuri ya": {
+        "completion": "kuwasha moto. Siku hii itakuwa nzuri.\nSiku hizi zimekuwa zikiwa na mwanga mwingi, na hivi karibuni watu wengi wameharibu mazingira.",
+        "length": 20,
+        "swahili_score": 1.0,
+        "coherence": 0.0625
+      },
+      "Mimi ni mwalimu wa shule ya msingi. Nina": {
+        "completion": "darasa la 4.\nNimesoma vitabu vya shule ya upili.\nKila kitu ni rahisi kama kuandika kwa herufi za msisitizo.\nKila mwanafunzi alikuwa ak",
+        "length": 23,
+        "swahili_score": 1.0,
+        "coherence": 0.125
+      },
+      "Nchini Tanzania, kilimo ni sekta muhimu.": {
+        "completion": "wanaobobea katika kilimo. Tofauti na nchi nyingine, kilimo cha Tanzania ni cha kipekee. Mwaka 2010 kilimo kilikuwa kiwango cha 6.1% cha Pato",
+        "length": 22,
+        "swahili_score": 1.0,
+        "coherence": 0.0625
+      },
+      "Siku moja, mtoto alikuwa akitembea porin": {
+        "completion": "akagundua mlango wa siri ambao haujagunduliwa hapo awali. Mvuto ulianza kutetemeka ndani yake, na alijikuta akitafuta habari zaidi juu ya mlango huo.",
+        "length": 22,
+        "swahili_score": 1.0,
+        "coherence": 0.0
+      },
+      "Kiswahili ni lugha ya Kiafrika inayozung": {
+        "completion": "zaidi nchini Tanzania na Kenya. Kufuatana na idadi ya wasemaji wake inakadiriwa kuwa watu 600,000, miongoni mwao wengi ni wasemaji wa Kiswahili",
+        "length": 22,
+        "swahili_score": 1.0,
+        "coherence": 0.07142857142857142
+      },
+      "Elimu ni muhimu sana. Kwa hiyo, wazazi w": {
+        "completion": "nini ili kuhakikisha watoto wao wanapata elimu bora?\nChaguo:\n- kufundisha watoto wao kuhusu elimu\n- kutoa chakula na maji\n- kuweka",
+        "length": 22,
+        "swahili_score": 1.0,
+        "coherence": 0.058823529411764705
+      }
+    }
+  }
+]
