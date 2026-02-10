@@ -746,7 +746,7 @@ class MetricsTracker:
                 }
                 
                 completions[prompt[:40]] = analysis
-                print(f"  ✓ Swahili score: {analysis['swahili_score']:.2f}")
+                print(f"   Swahili score: {analysis['swahili_score']:.2f}")
             
             model.train()
             
