@@ -6,9 +6,9 @@ A two-stage training methodology for culturally grounded Swahili and Kenyan lang
 
 ## Executive Summary
 
-Sauti AI is a production-oriented conversational AI framework designed for African languages, beginning with Swahili and extending systematically to Kikuyu and other Kenyan languages. The project introduces a validated two-stage training methodology—continued pretraining followed by conversational fine-tuning—implemented using parameter-efficient techniques (LoRA + 4-bit quantization) on accessible hardware.
+Sauti AI is a production-oriented conversational AI framework designed for African languages, beginning with Swahili and extending systematically to Kikuyu and other Kenyan languages. The project introduces a validated two-stage training methodology, continued pretraining followed by conversational fine-tuning, implemented using parameter-efficient techniques (LoRA + 4-bit quantization) on accessible hardware.
 
-An initial Swahili implementation of this methodology achieved a validation perplexity of 3.97, with end-to-end training completed in approximately 9 hours on a single P100 GPU. During the NIRU AI Hackathon 2026, this repository serves both as:
+An initial Swahili implementation of this methodology achieved a validation perplexity of 3.97(Stage 2 Fine-tuning), with end-to-end training completed in approximately 9 hours on a single P100 GPU. During the NIRU AI Hackathon 2026, this repository serves both as:
 
 1) A record of validated results, and
 
@@ -18,18 +18,18 @@ Because training outcomes depend on stochastic initialization, hardware variance
 
 ### What This Repository Represents
 
-✅ A proven training architecture for low-resource African languages
+ A proven training architecture for low-resource African languages
 
-✅ A production-quality Swahili MVP, already trained and deployed
+ A production-quality Swahili MVP, already trained and deployed
 
-🔄 A live reproducibility exercise, to be re-run during the competition
+ A live reproducibility exercise, to be re-run during the competition
 
-🔜 A foundation for Kikuyu expansion, using the same pipeline
+ A foundation for Kikuyu expansion, using the same pipeline
 
 This distinction is intentional and central to the project’s scientific and engineering integrity.
 
 ### Core Methodology: Two-Stage Training
-### Stage 1 — Continued Pretraining
+### Stage 1: Continued Pretraining
 
 #### Linguistic & Cultural Foundation
 
@@ -64,7 +64,7 @@ Validated Swahili configuration:
 
 This stage establishes deep linguistic grounding, reducing overfitting and instability during dialogue fine-tuning.
 
-### Stage 2 — Conversational Fine-Tuning
+### Stage 2: Conversational Fine-Tuning
 
 #### Dialogue Specialization
 
@@ -119,7 +119,7 @@ Sauti AI is designed to be computationally accessible, not infrastructure-heavy.
 
 This enables single-GPU training without measurable degradation in conversational quality.
 
-#### 🚀 Quick Start (Minimal & Reproducible)
+####  Quick Start (Minimal & Reproducible)
 
 This section provides a minimal, example-based entry point for running the Sauti AI training pipeline.
 
@@ -129,7 +129,7 @@ Note: Exact losses and perplexity values may vary across runs due to stochastic 
 
 Python 3.9+
 
-CUDA-capable GPU (16GB VRAM recommended)
+CUDA-capable GPU (Kaggle's P 100 recommended)
 
 Git LFS (for large model and dataset files)
 
@@ -149,7 +149,7 @@ git lfs pull
 ```
 ---
 
-#### Stage 1 — Continued Pretraining
+#### Stage 1: Continued Pretraining
 
 ```bash
 python src/stage1_pretraining_kaggle.py
@@ -157,7 +157,7 @@ python src/stage1_pretraining_kaggle.py
 ```
 ---
 
-#### Stage 2 — Conversational Fine-Tuning
+#### Stage 2: Conversational Fine-Tuning
 
 ```bash
 python src/training_pipeline.py \
