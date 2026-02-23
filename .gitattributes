@@ -5,7 +5,7 @@
 *.json filter=lfs diff=lfs merge=lfs -text
 *.md text eol=lf
 *.txt text eol=lf
-*.csv text eol=lf
+*.csv filter=lfs diff=lfs merge=lfs -text
 # Binary files
 *.pth binary
 *.pt binary
@@ -13,4 +13,4 @@
 *.safetensors filter=lfs diff=lfs merge=lfs -text
 # Auto-detect everything else
 * text=auto
-*.csv filter=lfs diff=lfs merge=lfs -text
+*.zip filter=lfs diff=lfs merge=lfs -text
