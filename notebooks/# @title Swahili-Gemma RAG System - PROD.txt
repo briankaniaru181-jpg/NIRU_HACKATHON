@@ -1,0 +1,600 @@
+# @title Swahili-Gemma RAG System - PRODUCTION READY
+!pip install transformers torch accelerate wikipedia-api wikipedia sentence-transformers faiss-cpu requests
+
+import torch
+import wikipediaapi
+import wikipedia
+import numpy as np
+import requests
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from sentence_transformers import SentenceTransformer
+import faiss
+import time
+import re
+from typing import List, Dict, Tuple, Optional
+
+# ============================
+# 1. SETUP AND MODEL LOADING
+# ============================
+device = "cuda" if torch.cuda.is_available() else "cpu"
+print(f"🚀 Using device: {device}")
+
+print("\n📥 Loading your fine-tuned Swahili-Gemma model...")
+start_time = time.time()
+
+# YOUR FINE-TUNED MODEL PATH
+MODEL_PATH = "/kaggle/input/notebooks/briangreenheart/finetuninggood/swahili-gemma-finetuned/merged_model"
+
+model = AutoModelForCausalLM.from_pretrained(
+    MODEL_PATH,
+    torch_dtype=torch.float16 if device == "cuda" else torch.float32,
+    device_map="auto" if device == "cuda" else None,
+    local_files_only=True,
+    low_cpu_mem_usage=True
+)
+
+tokenizer = AutoTokenizer.from_pretrained(
+    MODEL_PATH,
+    local_files_only=True
+)
+
+# Set padding token and side for decoder-only architecture
+tokenizer.pad_token = tokenizer.eos_token
+tokenizer.padding_side = "left"
+
+print(f"✅ Model loaded in {time.time() - start_time:.2f} seconds")
+
+print("\n📥 Loading embedding model for RAG...")
+embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+print("✅ Embedding model loaded")
+
+# ============================
+# 2. GENERATION SETTINGS
+# ============================
+generation_config_chat = {
+    "max_new_tokens": 100,
+    "do_sample": True,
+    "temperature": 0.3,
+    "top_p": 0.95,
+    "top_k": 64,
+    "repetition_penalty": 1.1,
+    "pad_token_id": tokenizer.eos_token_id,
+    "eos_token_id": tokenizer.eos_token_id,
+    "use_cache": True
+}
+
+# RAG generation (deterministic — no drift)
+generation_config_rag = {
+    "max_new_tokens": 80,
+    "do_sample": False,
+    "temperature": 0.0,
+    "repetition_penalty": 1.05,
+    "pad_token_id": tokenizer.eos_token_id,
+    "eos_token_id": tokenizer.eos_token_id,
+    "use_cache": True
+}
+
+print("\n⚙️ Generation Settings:")
+for key, value in generation_config.items():
+    if key not in ['pad_token_id', 'eos_token_id']:
+        print(f"   • {key}: {value}")
+
+# ============================
+# 3. DUCKDUCKGO FALLBACK
+# ============================
+class DuckDuckGoRetriever:
+    """Fallback retriever using DuckDuckGo Instant Answer API"""
+
+    def search(self, query: str) -> Optional[Dict]:
+        try:
+            url = "https://api.duckduckgo.com/"
+            params = {
+                "q": query,
+                "format": "json",
+                "no_html": 1,
+                "skip_disambig": 1,
+                "t": "swahili_rag"
+            }
+            headers = {"User-Agent": "SwahiliRAG/1.0"}
+            response = requests.get(url, params=params, headers=headers, timeout=5)
+
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("Answer"):
+                    return {
+                        "content": data["Answer"],
+                        "source": "DuckDuckGo",
+                        "url": "",
+                        "type": "answer"
+                    }
+                if data.get("AbstractText"):
+                    return {
+                        "content": data["AbstractText"],
+                        "source": "DuckDuckGo",
+                        "url": data.get("AbstractURL", ""),
+                        "type": "abstract"
+                    }
+        except Exception as e:
+            print(f"   ⚠️ DuckDuckGo error: {e}")
+        return None
+
+# ============================
+# 4. WIKIPEDIA KNOWLEDGE BASE
+# ============================
+class WikipediaKnowledgeBase:
+    """Knowledge base using Wikipedia with entity mapping and caching"""
+
+    def __init__(self, user_agent='SwahiliRAG/1.0'):
+        self.wiki_en = wikipediaapi.Wikipedia(
+            language='en',
+            user_agent=user_agent,
+            extract_format=wikipediaapi.ExtractFormat.WIKI
+        )
+        self.wiki_sw = wikipediaapi.Wikipedia(
+            language='sw',
+            user_agent=user_agent,
+            extract_format=wikipediaapi.ExtractFormat.WIKI
+        )
+        self.documents = []
+        self.index = None
+        self.page_cache = {}
+
+        # Entity mappings for common Swahili queries
+        self.entity_mappings = {
+            "gavana wa mombasa": "Abdulswamad Nassir",
+            "mombasa governor": "Abdulswamad Nassir",
+            "barack obama": "Barack Obama",
+            "obama": "Barack Obama",
+            "nairobi": "Nairobi",
+            "raila odinga": "Raila Odinga",
+            "hassan joho": "Hassan Joho",
+            "william ruto": "William Ruto",
+            "rais wa kenya": "William Ruto",
+            "president of kenya": "William Ruto",
+            "uhuru kenyatta": "Uhuru Kenyatta",
+            "kenya": "Kenya",
+            "tanzania": "Tanzania",
+            "dodoma": "Dodoma",
+            "dar es salaam": "Dar es Salaam",
+            "plato": "Plato",
+            "platoni": "Plato"
+        }
+
+    def get_best_search_term(self, query: str) -> str:
+        """Extract the best search term from the query"""
+        query_lower = query.lower()
+
+        # Check entity mappings first
+        for key, value in self.entity_mappings.items():
+            if key in query_lower:
+                print(f"   🔍 Mapped to: '{value}'")
+                return value
+
+        # Strip Swahili stopwords to extract main entity
+        stopwords = {"wa", "ni", "nani", "wapi", "gani", "sasa", "je", "na", "ya",
+                     "la", "za", "upi", "kwa", "katika", "yaani", "ndio", "huo"}
+        words = [w for w in query_lower.strip('?').split() if w not in stopwords]
+
+        # Return the longest meaningful phrase (up to 3 words)
+        result = " ".join(words[:3])
+        print(f"   🔍 Extracted search term: '{result}'")
+        return result
+
+    def search_and_fetch(self, query: str, lang: str = 'sw', max_results: int = 2) -> List[Dict]:
+        """Search Wikipedia (EN or SW) and fetch relevant articles"""
+        
+        # Create a unique cache key based on query AND language
+        cache_key = f"{query}_{lang}"
+        if cache_key in self.page_cache:
+            print(f"    ✅ Cache hit ({lang})")
+            return self.page_cache[cache_key]
+
+        articles = []
+        search_term = self.get_best_search_term(query)
+        print(f"    🔎 Searching {lang.upper()} for: '{search_term}'")
+
+        try:
+            # 1. Set the language for the library
+            wikipedia.set_lang(lang)
+            
+            # 2. Get search results - increase to get more candidates
+            wiki_results = wikipedia.search(search_term, results=5)
+            print(f"    📊 {lang.upper()} results: {wiki_results}")
+
+            # 3. First, try to find an exact title match
+            wiki_obj = self.wiki_en if lang == 'en' else self.wiki_sw
+            
+            # Check if any result exactly matches our search term
+            exact_match = None
+            for title in wiki_results:
+                if search_term.lower() in title.lower() or title.lower() in search_term.lower():
+                    exact_match = title
+                    break
+            
+            if exact_match:
+                page = wiki_obj.page(exact_match)
+                if page.exists():
+                    articles.append({
+                        'title': page.title,
+                        'content': page.summary,
+                        'url': page.fullurl,
+                        'language': lang
+                    })
+                    print(f"    ✅ Exact match found ({lang.upper()}): {page.title}")
+            
+            # 4. If no exact match, try all results
+            if not articles:
+                for title in wiki_results:
+                    page = wiki_obj.page(title)
+                    if page.exists():
+                        articles.append({
+                            'title': page.title,
+                            'content': page.summary,
+                            'url': page.fullurl,
+                            'language': lang
+                        })
+                        print(f"    ✅ Found ({lang.upper()}): {page.title}")
+                        break  # Take the first good result
+
+            # 5. Save to cache
+            self.page_cache[cache_key] = articles
+            return articles
+
+        except Exception as e:
+            print(f"    ❌ Error searching Wikipedia ({lang}): {e}")
+            return []
+
+    def create_vector_store(self, articles: List[Dict]) -> int:
+        """Create FAISS vector store from articles"""
+        self.documents = []
+        for article in articles:
+            chunks = self._chunk_text(article['content'])
+            for i, chunk in enumerate(chunks):
+                self.documents.append({
+                    'title': article['title'],
+                    'content': chunk,
+                    'url': article['url'],
+                    'language': article.get('language', 'en'),
+                    'chunk_id': i
+                })
+
+        if self.documents:
+            texts = [doc['content'] for doc in self.documents]
+            embeddings = embedding_model.encode(texts)
+            dimension = embeddings.shape[1]
+            self.index = faiss.IndexFlatL2(dimension)
+            self.index.add(embeddings.astype('float32'))
+
+        return len(self.documents)
+
+    def _chunk_text(self, text: str, chunk_size: int = 500) -> List[str]:
+        """Split text into overlapping chunks"""
+        words = text.split()
+        chunks = []
+        for i in range(0, len(words), chunk_size - 50):
+            chunk = ' '.join(words[i:i + chunk_size])
+            chunks.append(chunk)
+        return chunks
+
+    def retrieve_relevant_context(self, query: str, k: int = 2) -> List[Dict]:
+        """Retrieve most relevant document chunks for query"""
+        if not self.index or not self.documents:
+            return []
+
+        query_embedding = embedding_model.encode([query])
+        distances, indices = self.index.search(query_embedding.astype('float32'), k)
+
+        return [self.documents[idx] for idx in indices[0] if idx < len(self.documents)]
+
+# ============================
+# 5. SAFE RESPONSE EXTRACTION
+# ============================
+def extract_model_response(full_response: str, prompt: Optional[str] = None) -> str:
+    if "\nmodel\n" in full_response:
+        response = full_response.split("\nmodel\n")[-1].strip()
+        lines = [l for l in response.split('\n') if l.strip()]
+        response = lines[0].strip() if lines else response
+        return re.sub(r'^(Answer:|Jibu sahihi:|Jibu:)\s*', '', response).strip()
+
+    if prompt and prompt in full_response:
+        response = full_response.split(prompt)[-1].strip()
+        lines = [l for l in response.split('\n') if l.strip()]
+        response = lines[0].strip() if lines else response
+        return re.sub(r'^(Answer:|Jibu sahihi:|Jibu:)\s*', '', response).strip()
+
+    lines = [l for l in full_response.strip().split('\n') if l.strip()]
+    response = lines[0].strip() if lines else full_response.strip()
+    return re.sub(r'^(Answer:|Jibu sahihi:|Jibu:)\s*', '', response).strip()
+
+# ============================
+# 6. BASELINE (NO RAG) - USING CHAT TEMPLATE
+# ============================
+def generate_no_rag(prompt: str) -> str:
+    """Generate response without RAG (baseline) using your model's chat format"""
+    # Use the correct chat format for your fine-tuned model
+    formatted = f"<start_of_turn>user\n{prompt}<end_of_turn>\n<start_of_turn>model\n"
+    inputs = tokenizer(formatted, return_tensors="pt", padding=True, truncation=True)
+
+    input_ids = inputs.input_ids.to(model.device)
+    attention_mask = inputs.attention_mask.to(model.device)
+
+    with torch.no_grad():
+        outputs = model.generate(
+        input_ids=input_ids,
+        attention_mask=attention_mask,
+        **generation_config_chat
+   )
+
+    full_response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    return extract_model_response(full_response)
+
+# ============================
+# 7. RAG GENERATION - CORRECTED WITH ENTITY PRIORITY
+# ============================
+def generate_with_rag(
+    query: str, 
+    kb: WikipediaKnowledgeBase, 
+    ddg: Optional[DuckDuckGoRetriever] = None, 
+    show_context: bool = False
+) -> Tuple[str, List[Dict]]:
+    """Generate response using English-First RAG with Swahili fallback"""
+
+    print(f"\n🔍 Query: '{query}'")
+
+    # Step 1: Search English Wikipedia First (Higher data density)
+    print("   🌍 Searching English Wikipedia...")
+    articles = kb.search_and_fetch(query, lang='en')
+    
+    # Step 2: Fallback to Swahili Wikipedia if English is empty
+    if not articles:
+        print("   🌍 No English results. Searching Swahili Wikipedia...")
+        articles = kb.search_and_fetch(query, lang='sw')
+
+    context = ""
+    sources = []
+
+    if articles:
+        kb.create_vector_store(articles)
+        # Fetch k=4 to allow our Priority logic room to filter
+        relevant_docs = kb.retrieve_relevant_context(query, k=4)
+
+        # --- ENHANCED ENTITY PRIORITY LOGIC ---
+        priority_docs = []
+        other_docs = []
+
+        # Clean search terms for matching
+        search_terms = query.lower().replace('?', '').split()
+
+        # Get the main entity (remove question words and stopwords)
+        main_entity = None
+        stopwords = {"wa", "ni", "nani", "nini", "wapi", "lini", "ngapi", "vipi", "gani", "ipi", "upi", "ya", "za", "la"}
+        for term in search_terms:
+            if term not in stopwords and len(term) > 2:
+                main_entity = term
+                break
+
+        for doc in relevant_docs:
+            title_lower = doc['title'].lower()
+            
+            # Priority 1: Exact title match with main entity
+            if main_entity and main_entity in title_lower:
+                priority_docs.insert(0, doc)  # Put at the very front
+            # Priority 2: Title contains any search term
+            elif any(term in title_lower for term in search_terms if len(term) > 3):
+                priority_docs.append(doc)
+            else:
+                other_docs.append(doc)
+
+        # Re-order: Priority matches go to the top
+        final_docs = (priority_docs + other_docs)[:2]
+
+        for doc in final_docs:
+            lang_note = " (English)" if doc['language'] == 'en' else " (Kiswahili)"
+            context += f"[Wikipedia{lang_note} - {doc['title']}]\n{doc['content']}\n\n"
+
+            if not any(s['url'] == doc['url'] for s in sources):
+                sources.append({
+                    'title': doc['title'],
+                    'url': doc['url'],
+                    'language': doc['language']
+                })
+
+    # Step 3: DuckDuckGo Fallback (if Wikipedia fails entirely)
+    if not context and ddg:
+        print("   ⏳ Trying DuckDuckGo fallback...")
+        result = ddg.search(query)
+        if result:
+            context = result['content']
+            sources.append({
+                'title': 'DuckDuckGo',
+                'url': result.get('url', ''),
+                'language': 'en'
+            })
+
+    # Step 4: Generation with strict instructions
+    if context:
+        if show_context:
+            print(f"\n📚 Context preview:\n{context[:400]}...\n")
+
+        user_message = f"""
+Answer in Swahili only. 
+
+Strict rules:
+1. Use ONLY the TAARIFA below.
+2. If the TAARIFA does not mention the subject of the SWALI, say you don't know.
+3. Limit to 3 sentences.
+
+TAARIFA:
+{context}
+
+SWALI: {query}"""
+    else:
+        user_message = query
+
+    # Your standard Chat Template formatting and model.generate code follows here...
+    formatted = f"<start_of_turn>user\n{user_message}<end_of_turn>\n<start_of_turn>model\n"
+
+    inputs = tokenizer(formatted, return_tensors="pt", padding=True, truncation=True)
+
+    if inputs["input_ids"].shape[-1] > 2048:
+        inputs["input_ids"] = inputs["input_ids"][:, -2048:]
+        inputs["attention_mask"] = inputs["attention_mask"][:, -2048:]
+
+    input_ids = inputs.input_ids.to(model.device)
+    attention_mask = inputs.attention_mask.to(model.device)
+
+    with torch.no_grad():
+        outputs = model.generate(
+        input_ids=input_ids,
+        attention_mask=attention_mask,
+        **generation_config_rag
+        )
+
+    full_response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    response = extract_model_response(full_response)
+
+    return response, sources
+# ============================
+# 7.5 AUGMENTED CLASSIFIER (INSERT HERE)
+# ============================
+def classify_query_type(query: str) -> str:
+    query_lower = query.lower()
+    # Roots for Swahili prefixes
+    opinion_roots = ['zur', 'bay', 'dhani', 'fikiri', 'maoni', 'pendekez', 'bora']
+    factual_roots = ['nan', 'nin', 'wap', 'lin', 'ngap', 'idad', 'tarek', 'mwak']
+    
+    if any(root in query_lower for root in opinion_roots):
+        return "OPINION"
+    if any(root in query_lower for root in factual_roots):
+        return "FACTUAL"
+    if any(word[0].isupper() for word in query.split() if len(word) > 2):
+        return "FACTUAL"
+    return "CONVERSATIONAL"
+
+# Update your needs_rag to use the classifier
+def needs_rag_augmented(query: str, threshold: float = 0.45) -> bool:
+    q_type = classify_query_type(query)
+    if q_type == "OPINION": return False
+    if q_type == "FACTUAL": return True
+    
+    # Fallback to semantic similarity for conversational queries
+    query_embedding = embedding_model.encode(query, convert_to_tensor=True)
+    scores = util.cos_sim(query_embedding, factual_embeddings)
+    return scores.max().item() > threshold
+
+# ============================
+# 8. RUN TESTS (CORRECTED)
+# ============================
+# ... rest of your testing code ...
+# ============================
+# 8. RUN TESTS (CORRECTED)
+# ============================
+print("\n" + "=" * 70)
+print("🚀 TESTING RAG SYSTEM WITH ENHANCED ROUTING")
+print("=" * 70)
+
+kb = WikipediaKnowledgeBase()
+ddg = DuckDuckGoRetriever()
+
+test_prompts = [
+    "Gavana wa mombasa wa sasa ni nani?",
+    "watu wa Kenya ni wazuri?",
+    "Greenland ina watu wangapi?",
+    "Plato ni nani?",
+]
+
+from sentence_transformers import util
+
+# EXHAUSTIVE FACTUAL ANCHORS
+factual_examples = [
+    # Politics & Government
+    "Rais wa Kenya ni nani", "Gavana wa sasa wa Mombasa ni nani", 
+    "Waziri wa afya", "Muundo wa serikali",
+    # Geography & Statistics
+    "Idadi ya watu nchini Greenland", "Mji mkuu wa nchi", 
+    "Mto mrefu zaidi duniani", "Inapakana na nchi gani",
+    # Science & Nature
+    "Nini maana ya photosynthesis", "Mlima mrefu zaidi", 
+    "Sayari katika mfumo wa jua", "Dalili za ugonjwa",
+    # History & Philosophy
+    "Plato alisema nini", "Historia ya vita vya kwanza", 
+    "Falsafa ya zamani", "Nadharia ya Einstein",
+    # Biography
+    "Fred Quimby alikuwa nani", "Alizaliwa lini", 
+    "Mvumbuzi wa kitu gani", "Kazi za mwandishi fulani",
+    # Tech & Academic
+    "Maana ya Artificial Intelligence", "Kanuni za hisabati", 
+    "Jinsi ya kutumia kompyuta"
+]
+
+factual_embeddings = embedding_model.encode(factual_examples, convert_to_tensor=True)
+
+def needs_rag(query: str, threshold: float = 0.45) -> bool:
+    # 1. Quick Keyword Trigger (High Recall)
+    question_words = ['nani', 'nini', 'wapi', 'lini', 'ngapi', 'vipi', 'gani', 'ipi', 'upi']
+    if any(word in query.lower().split() for word in question_words):
+        print("    🔍 Keyword Match: Forcing RAG...")
+        return True
+
+    # 2. Semantic Similarity (Handling implied questions)
+    query_embedding = embedding_model.encode(query, convert_to_tensor=True)
+    scores = util.cos_sim(query_embedding, factual_embeddings)
+    max_score = scores.max().item()
+    print(f"    🎯 Routing confidence: {max_score:.3f}")
+    return max_score > threshold
+
+# Test loop
+for i, query in enumerate(test_prompts, 1):
+    print(f"\n📝 QUESTION {i}: {query}")
+    print("-" * 60)
+    
+    if needs_rag(query):
+        print("\n✅ WITH RAG:")
+        # Your RAG generation function
+        response, sources = generate_with_rag(query, kb, ddg, show_context=True)
+        print(f"   {response}")
+        
+        if sources:
+            print("\n📚 Sources:")
+            for s in sources:
+                lang = " (Swahili)" if s.get('language') == 'sw' else ""
+                print(f"   • {s['title']}{lang}: {s['url']}")
+    else:
+        print("\n⚡ SKIPPING RAG (conversational):")
+        response = generate_no_rag(query)
+        print(f"   {response}")
+    print("-" * 60)
+
+print("\n" + "=" * 70)
+print("📊 SYSTEM SUMMARY: Routing Threshold set to 0.45 with Keyword Overrides.")
+print("=" * 70)
+
+# ============================
+# 9. SUMMARY
+# ============================
+print("\n" + "=" * 70)
+print("📊 SYSTEM SUMMARY")
+print("=" * 70)
+
+print("""
+✅ KEY FEATURES:
+   • Entity mapping for Swahili queries (including Plato)
+   • Multi-language Wikipedia search with exact title matching
+   • FAISS vector similarity search
+   • DuckDuckGo fallback
+   • Response caching
+   • Safe response extraction
+   • YOUR FINE-TUNED MODEL with chat template
+   • Enhanced entity priority logic
+
+⚙️ OPTIMIZED SETTINGS:
+   • temperature: 0.3
+   • top_p: 0.95
+   • top_k: 64
+   • repetition_penalty: 1.1
+   • do_sample: True
+   • padding_side: left (for decoder-only architecture)
+
+🚀 USAGE:
+   response, sources = generate_with_rag(query, kb, ddg)
+""")
