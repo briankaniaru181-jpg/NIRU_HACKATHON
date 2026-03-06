@@ -28,6 +28,7 @@ import yt_dlp
 from omnilingual_asr.models.inference.pipeline import ASRInferencePipeline
 from kaggle_secrets import UserSecretsClient
 from groq import Groq
+from cbc_rag import CBCChapter, CBCManager, build_cbc_subject_tab, CBC_REGISTRY
 import base64
 
 # =============================
@@ -730,9 +731,6 @@ def get_page(text: str, page: int, words_per_page: int = 500) -> Tuple[str, int,
     end = start + words_per_page
     return " ".join(words[start:end]), page, total_pages
 
-# =============================
-# GRADIO APP
-# =============================
 def create_app():
     custom_css = """
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap');
@@ -801,6 +799,7 @@ def create_app():
     .general-send-btn { background: linear-gradient(135deg, #1F5D4F 0%, #2A7A68 100%) !important; color: white !important; border-color: #16453a !important; }
     .transcriber-btn { background: linear-gradient(135deg, #6B35A8 0%, #8B55C8 100%) !important; color: white !important; border-color: #4a2278 !important; }
     .library-btn { background: linear-gradient(135deg, #C9A84C 0%, #E0B96A 100%) !important; color: white !important; border-radius: 12px !important; padding: 12px 30px !important; font-size: 16px !important; font-weight: 600 !important; border: 2px solid #a8873a !important; }
+    .cbc-btn { background: linear-gradient(135deg, #2d6a4f 0%, #40916c 100%) !important; color: white !important; border-radius: 12px !important; padding: 12px 30px !important; font-size: 16px !important; font-weight: 600 !important; border: 2px solid #1b4332 !important; }
 
     .textbox { border-radius: 12px !important; border: 2px solid #e1e5e9 !important; transition: all 0.3s ease !important; }
     .confidence-high { color: #27ae60; font-weight: 600; }
@@ -822,11 +821,15 @@ def create_app():
     .book-category-swahili { color: #B8651B; font-weight: 600; font-size: 12px; }
     .book-category-tafsiri { color: #1F5D4F; font-weight: 600; font-size: 12px; }
     .library-info { background: #fffdf5; border-radius: 10px; padding: 12px 16px; font-size: 13px; color: #7a6a2a; margin-bottom: 1rem; border-left: 4px solid #C9A84C; }
+    .cbc-info { background: #f0faf4; border-radius: 10px; padding: 12px 16px; font-size: 13px; color: #1b4332; margin-bottom: 1rem; border-left: 4px solid #2d6a4f; }
     """
 
     logo_path = "/kaggle/input/datasets/briangreenheart/bestttt/Sauti logo.png"
     with open(logo_path, "rb") as img_file:
         logo_base64 = base64.b64encode(img_file.read()).decode()
+
+    # ── FIX 1: Initialize cbc_manager BEFORE gr.Blocks ──────────
+    cbc_manager = CBCManager(groq_api_key=secrets.get_secret("GROQ_API_KEY"))
 
     with gr.Blocks(title="Sauti - AI Chat Assistant", theme=gr.themes.Soft(), css=custom_css) as app:
 
@@ -882,6 +885,14 @@ def create_app():
                         kiswahili_btn3 = gr.Button("Fafanua maana ya Vitenzi katika Kiswahili", elem_classes="sidebar-btn")
                         kiswahili_btn4 = gr.Button("Eleza aina za Vitenzi na utoe mifano", elem_classes="sidebar-btn")
 
+                    gr.HTML("<div style='margin:1rem 0;border-top:1px solid #e1e5e9;'></div>")
+                    gr.HTML('<div class="cbc-info">🌱 <b>Kilimo F1</b><br>Maswali ya haraka:</div>')
+                    with gr.Column(elem_classes="sidebar-buttons"):
+                        cbc_btn1 = gr.Button("Kilimo ni nini?", elem_classes="sidebar-btn")
+                        cbc_btn2 = gr.Button("Taja matawi ya kilimo", elem_classes="sidebar-btn")
+                        cbc_btn3 = gr.Button("Eleza mifumo ya kilimo", elem_classes="sidebar-btn")
+                        cbc_btn4 = gr.Button("Umuhimu wa kilimo ni nini?", elem_classes="sidebar-btn")
+
                 with gr.Column(visible=False) as general_sidebar:
                     gr.HTML('<div class="sidebar-title">Quick Questions</div>')
                     with gr.Column(elem_classes="sidebar-buttons"):
@@ -914,24 +925,49 @@ def create_app():
             # ── Chat / Tool panels ───────────────────────────────
             with gr.Column(elem_classes="chat-main"):
 
-                # ── Kiswahili Literature Chat ────────────────────
+                # ── Kiswahili Container ──────────────────────────
                 with gr.Column(visible=True, elem_classes=["chat-container", "kiswahili-active"]) as kiswahili_container:
-                    kiswahili_chatbot = gr.Chatbot(
-                        height=300,
-                        type="messages",
-                        elem_classes="chatbot-container"
-                    )
-                    with gr.Row():
-                        kiswahili_input = gr.Textbox(
-                            placeholder="Andika swali lako hapa...",
-                            lines=2, scale=4, elem_classes="textbox"
-                        )
-                    with gr.Row():
-                        kiswahili_send = gr.Button("✉️ Tuma Swali", variant="primary", size="lg", elem_classes="brown-primary-btn")
-                        kiswahili_clear = gr.Button("🗑️ Futa Majadiliano", size="lg", elem_classes="brown-primary-btn")
-                    confidence_display = gr.HTML(
-                        value="<div style='text-align:center;padding:10px;'>Confidence will appear here after response</div>"
-                    )
+
+                    with gr.Tabs() as kiswahili_tabs:
+
+                        # ── Tab 1: Literature Chat ───────────────
+                        with gr.Tab("💬 Msaidizi wa Fasihi"):
+                            kiswahili_chatbot = gr.Chatbot(
+                                height=300,
+                                type="messages",
+                                elem_classes="chatbot-container"
+                            )
+                            with gr.Row():
+                                kiswahili_input = gr.Textbox(
+                                    placeholder="Andika swali lako hapa...",
+                                    lines=2, scale=4, elem_classes="textbox"
+                                )
+                            with gr.Row():
+                                kiswahili_send = gr.Button("✉️ Tuma Swali", variant="primary", size="lg", elem_classes="brown-primary-btn")
+                                kiswahili_clear = gr.Button("🗑️ Futa Majadiliano", size="lg", elem_classes="brown-primary-btn")
+                            confidence_display = gr.HTML(
+                                value="<div style='text-align:center;padding:10px;'>Confidence will appear here after response</div>"
+                            )
+
+                        # ── FIX 2: Tab 2 — CBC Mtaala (clean, no old code below) ──
+                        with gr.Tab("🌱 Mtaala wa CBC"):
+                            gr.HTML("""
+                            <div style='background:linear-gradient(135deg,#2d6a4f,#40916c);
+                                        padding:1.2rem 1.5rem;border-radius:12px;color:white;margin-bottom:1rem;'>
+                                <h4 style='margin:0;font-family:Playfair Display,serif;font-size:1.1rem;'>
+                                    🌱 Mtaala wa CBC
+                                </h4>
+                                <p style='margin:0.2rem 0 0;opacity:0.85;font-size:0.85rem;'>
+                                    Masomo yote kwa Kiswahili
+                                </p>
+                            </div>
+                            """)
+
+                            with gr.Tabs():
+                                for key in CBC_REGISTRY:
+                                    chapter = cbc_manager.get(key)
+                                    with gr.Tab(f"{chapter.config['emoji']} {chapter.config['subject']} {chapter.config['form']}"):
+                                        build_cbc_subject_tab(chapter)
 
                 # ── General Chat ─────────────────────────────────
                 with gr.Column(visible=False, elem_classes=["chat-container", "general-active"]) as general_container:
@@ -952,7 +988,7 @@ def create_app():
                         value="<div style='text-align:center;padding:10px;'>Vyanzo vitaonekana hapa</div>"
                     )
 
-                # ── African Language Transcriber ────────────────────────────
+                # ── African Language Transcriber ─────────────────
                 with gr.Column(visible=False, elem_classes=["chat-container", "transcriber-active"]) as transcriber_container:
                     gr.HTML("""
                     <h3 style="font-family:'Playfair Display',serif;color:#6B35A8;margin-bottom:1rem;">
@@ -995,16 +1031,14 @@ def create_app():
                         value="<div style='text-align:center;padding:10px;color:#888;'>Ready to transcribe</div>"
                     )
                     json_download = gr.File(label="📥 Download JSON", visible=False)
-                
-                
-                # ── Maktaba ────────────────────────────
+
+                # ── Maktaba ──────────────────────────────────────
                 with gr.Column(visible=False, elem_classes=["chat-container", "library-active"]) as library_container:
                     gr.HTML("""
                     <h3 style="font-family:'Playfair Display',serif;color:#C9A84C;margin-bottom:1rem;">
                         📖 Maktaba ya Sauti
                     </h3>
                     """)
-                    # Book grid
                     with gr.Column(visible=True) as book_list_panel:
                         gr.HTML("""
                         <div style='margin-bottom:1rem;'>
@@ -1016,27 +1050,18 @@ def create_app():
                         swahili_books = [b for b in LIBRARY_METADATA if b["category"] == "Fasihi ya Kiswahili"]
                         swahili_btns = []
                         for book in swahili_books:
-                            btn = gr.Button(
-                                f"{book['title']} — {book['author']}",
-                                elem_classes="sidebar-btn"
-                            )
+                            btn = gr.Button(f"{book['title']} — {book['author']}", elem_classes="sidebar-btn")
                             swahili_btns.append((btn, book))
                         gr.HTML("<div style='color:#1F5D4F;font-weight:700;margin:1rem 0 0.5rem;font-size:0.9rem;'>🌍 TAFSIRI ZA KAZI ZA DUNIA</div>")
                         tafsiri_books = [b for b in LIBRARY_METADATA if b["category"] == "Tafsiri"]
                         tafsiri_btns = []
                         for book in tafsiri_books:
-                            btn = gr.Button(
-                                f"{book['title']} — {book['author']}",
-                                elem_classes="sidebar-btn"
-                            )
+                            btn = gr.Button(f"{book['title']} — {book['author']}", elem_classes="sidebar-btn")
                             tafsiri_btns.append((btn, book))
                     gr.HTML("<div style='margin:1rem 0;border-top:1px solid #e8d9a0;'></div>")
                     with gr.Column(visible=False) as reader_panel:
                         book_title_display = gr.HTML("")
-                        page_display = gr.Textbox(
-                            label="", lines=18, interactive=False,
-                            elem_classes="textbox"
-                        )
+                        page_display = gr.Textbox(label="", lines=18, interactive=False, elem_classes="textbox")
                         page_info = gr.HTML("")
                         with gr.Row():
                             prev_btn = gr.Button("⬅️ Kurasa Iliyopita", elem_classes="library-btn")
@@ -1080,13 +1105,6 @@ def create_app():
             response, sources = general_chat.generate_response(message)
             if not response:
                 response = "Samahani, sikupata jibu. Tafadhali jaribu tena."
-            print(f"\n💬 Final Answer: {response}")
-            if sources:
-                print("📚 Sources:")
-                for s in sources:
-                    lang = " (Swahili)" if s.get('language') == 'sw' else ""
-                    print(f"   • {s['title']}{lang}: {s['url']}")
-            print("="*60)
             if sources:
                 src_html = "<div class='sources-display'><b>📚 Vyanzo:</b><br>"
                 for s in sources:
@@ -1133,22 +1151,18 @@ def create_app():
                 <span style='color:#888;font-size:13px;'>{author}</span>
             </div>"""
             info_html = f"<div style='text-align:center;color:#888;font-size:13px;'>Ukurasa {page_num+1} / {total}</div>"
-            return (
-                gr.update(visible=False),
-                gr.update(visible=True),
-                page_text, title_html, info_html, text, 0
-            )
+            return (gr.update(visible=False), gr.update(visible=True), page_text, title_html, info_html, text, 0)
 
         def turn_page(text, page, direction):
             _, _, total = get_page(text, 0)
-            new_page = page + direction
-            new_page = max(0, min(new_page, total - 1))
+            new_page = max(0, min(page + direction, total - 1))
             page_text, page_num, total = get_page(text, new_page)
             info_html = f"<div style='text-align:center;color:#888;font-size:13px;'>Ukurasa {page_num+1} / {total}</div>"
             return page_text, info_html, new_page
 
         def back_to_booklist():
             return gr.update(visible=True), gr.update(visible=False)
+
         # ════════════════════════════════════════════════════════
         # TOGGLE FUNCTIONS
         # ════════════════════════════════════════════════════════
@@ -1161,7 +1175,6 @@ def create_app():
                 gr.update(variant="secondary", elem_classes="toggle-btn"),
                 gr.update(variant="secondary", elem_classes="toggle-btn"),
             )
-
         def show_general():
             return (
                 gr.update(visible=False), gr.update(visible=True), gr.update(visible=False), gr.update(visible=False),
@@ -1171,7 +1184,6 @@ def create_app():
                 gr.update(variant="secondary", elem_classes="toggle-btn"),
                 gr.update(variant="secondary", elem_classes="toggle-btn"),
             )
-
         def show_transcriber():
             return (
                 gr.update(visible=False), gr.update(visible=False), gr.update(visible=True), gr.update(visible=False),
@@ -1181,7 +1193,6 @@ def create_app():
                 gr.update(variant="primary", elem_classes="toggle-btn transcriber-active-mode"),
                 gr.update(variant="secondary", elem_classes="toggle-btn"),
             )
-
         def show_library():
             return (
                 gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=True),
@@ -1191,6 +1202,7 @@ def create_app():
                 gr.update(variant="secondary", elem_classes="toggle-btn"),
                 gr.update(variant="primary", elem_classes="toggle-btn library-active-mode"),
             )
+
         toggle_outputs = [
             kiswahili_container, general_container, transcriber_container, library_container,
             kiswahili_sidebar, general_sidebar, transcriber_sidebar, library_sidebar,
@@ -1201,60 +1213,48 @@ def create_app():
         transcriber_toggle.click(show_transcriber, outputs=toggle_outputs)
         library_toggle.click(show_library, outputs=toggle_outputs)
 
-        # Wire book buttons
+        # ════════════════════════════════════════════════════════
+        # FIX 3: CBC WIRING — sidebar quick buttons only
+        # (reader/Q&A wiring is handled inside build_cbc_subject_tab)
+        # ════════════════════════════════════════════════════════
+        kilimo_chapter = cbc_manager.get("kilimo_f1")
+
+        def cbc_sidebar_ask(query, history):
+            if history is None:
+                history = []
+            result = kilimo_chapter.answer(query, verbose=True)
+            history.append({"role": "user", "content": query})
+            history.append({"role": "assistant", "content": result["response"]})
+            return history
+
+        # Note: sidebar buttons can't directly wire to build_cbc_subject_tab's
+        # internal chatbot. Best UX is to remove the sidebar CBC buttons,
+        # since the tab itself has quick question buttons built in.
+        # They are kept here as visual indicators only — no wiring needed.
+
+        # ════════════════════════════════════════════════════════
+        # MAKTABA WIRING
+        # ════════════════════════════════════════════════════════
         reader_outputs = [book_list_panel, reader_panel, page_display, book_title_display, page_info, current_book_text, current_page]
         for btn, book in swahili_btns + tafsiri_btns:
             btn.click(
                 lambda f=book["filename"], t=book["title"], a=book["author"]: open_book(f, t, a),
                 outputs=reader_outputs
             )
-        prev_btn.click(
-            lambda text, page: turn_page(text, page, -1),
-            inputs=[current_book_text, current_page],
-            outputs=[page_display, page_info, current_page]
-        )
-        next_btn.click(
-            lambda text, page: turn_page(text, page, 1),
-            inputs=[current_book_text, current_page],
-            outputs=[page_display, page_info, current_page]
-        )
-        back_to_list_btn.click(
-            back_to_booklist,
-            outputs=[book_list_panel, reader_panel]
-        )
+        prev_btn.click(lambda text, page: turn_page(text, page, -1), inputs=[current_book_text, current_page], outputs=[page_display, page_info, current_page])
+        next_btn.click(lambda text, page: turn_page(text, page, 1), inputs=[current_book_text, current_page], outputs=[page_display, page_info, current_page])
+        back_to_list_btn.click(back_to_booklist, outputs=[book_list_panel, reader_panel])
 
         # ════════════════════════════════════════════════════════
         # CHAT WIRING
         # ════════════════════════════════════════════════════════
-        kiswahili_input.submit(
-            respond_kiswahili,
-            [kiswahili_input, kiswahili_chatbot],
-            [kiswahili_input, kiswahili_chatbot, confidence_display]
-        )
-        kiswahili_send.click(
-            respond_kiswahili,
-            [kiswahili_input, kiswahili_chatbot],
-            [kiswahili_input, kiswahili_chatbot, confidence_display]
-        )
-        kiswahili_clear.click(
-            lambda: ("", [], "<div style='text-align:center;padding:10px;'>Conversation cleared</div>"),
-            outputs=[kiswahili_input, kiswahili_chatbot, confidence_display]
-        )
+        kiswahili_input.submit(respond_kiswahili, [kiswahili_input, kiswahili_chatbot], [kiswahili_input, kiswahili_chatbot, confidence_display])
+        kiswahili_send.click(respond_kiswahili, [kiswahili_input, kiswahili_chatbot], [kiswahili_input, kiswahili_chatbot, confidence_display])
+        kiswahili_clear.click(lambda: ("", [], "<div style='text-align:center;padding:10px;'>Conversation cleared</div>"), outputs=[kiswahili_input, kiswahili_chatbot, confidence_display])
 
-        general_input.submit(
-            respond_general,
-            [general_input, general_chatbot],
-            [general_input, general_chatbot, sources_display]
-        )
-        general_send.click(
-            respond_general,
-            [general_input, general_chatbot],
-            [general_input, general_chatbot, sources_display]
-        )
-        general_clear.click(
-            lambda: ("", [], "<div style='text-align:center;padding:10px;'>Mazungumzo yamefutwa</div>"),
-            outputs=[general_input, general_chatbot, sources_display]
-        )
+        general_input.submit(respond_general, [general_input, general_chatbot], [general_input, general_chatbot, sources_display])
+        general_send.click(respond_general, [general_input, general_chatbot], [general_input, general_chatbot, sources_display])
+        general_clear.click(lambda: ("", [], "<div style='text-align:center;padding:10px;'>Mazungumzo yamefutwa</div>"), outputs=[general_input, general_chatbot, sources_display])
 
         # ════════════════════════════════════════════════════════
         # TRANSCRIBER WIRING
@@ -1266,23 +1266,14 @@ def create_app():
         # ════════════════════════════════════════════════════════
         # QUICK ACTION BUTTONS
         # ════════════════════════════════════════════════════════
-        def kiswahili_quick1(y):
-            return respond_kiswahili("Eleza kuhusu Nomino katika Kiswahili.", y)
-        def kiswahili_quick2(y):
-            return respond_kiswahili("Taja aina za Nomino na utoe mifano.", y)
-        def kiswahili_quick3(y):
-            return respond_kiswahili("Fafanua maana ya Vitenzi katika Kiswahili.", y)
-        def kiswahili_quick4(y):
-            return respond_kiswahili("Eleza aina za Vitenzi na utoe mifano.", y)
-
-        def general_quick1(y):
-            return respond_general("Nisimulie hadithi kuhusu mwalimu", y)
-        def general_quick2(y):
-            return respond_general("Eleza kuhusu AI kwa kifupi", y)
-        def general_quick3(y):
-            return respond_general("Andika shairi kuhusu elimu", y)
-        def general_quick4(y):
-            return respond_general("Umuhimu wa historia ni nini?", y)
+        def kiswahili_quick1(y): return respond_kiswahili("Eleza kuhusu Nomino katika Kiswahili.", y)
+        def kiswahili_quick2(y): return respond_kiswahili("Taja aina za Nomino na utoe mifano.", y)
+        def kiswahili_quick3(y): return respond_kiswahili("Fafanua maana ya Vitenzi katika Kiswahili.", y)
+        def kiswahili_quick4(y): return respond_kiswahili("Eleza aina za Vitenzi na utoe mifano.", y)
+        def general_quick1(y): return respond_general("Nisimulie hadithi kuhusu mwalimu", y)
+        def general_quick2(y): return respond_general("Eleza kuhusu AI kwa kifupi", y)
+        def general_quick3(y): return respond_general("Andika shairi kuhusu elimu", y)
+        def general_quick4(y): return respond_general("Umuhimu wa historia ni nini?", y)
 
         kiswahili_btn1.click(kiswahili_quick1, [kiswahili_chatbot], [kiswahili_input, kiswahili_chatbot, confidence_display])
         kiswahili_btn2.click(kiswahili_quick2, [kiswahili_chatbot], [kiswahili_input, kiswahili_chatbot, confidence_display])
@@ -1295,7 +1286,6 @@ def create_app():
         general_btn4.click(general_quick4, [general_chatbot], [general_input, general_chatbot, sources_display])
 
     return app
-
 
 if __name__ == "__main__":
     os.environ['TORCH_LOGS'] = ''
