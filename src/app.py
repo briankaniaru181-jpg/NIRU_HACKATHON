@@ -828,7 +828,6 @@ def create_app():
     with open(logo_path, "rb") as img_file:
         logo_base64 = base64.b64encode(img_file.read()).decode()
 
-    # ── FIX 1: Initialize cbc_manager BEFORE gr.Blocks ──────────
     cbc_manager = CBCManager(groq_api_key=secrets.get_secret("GROQ_API_KEY"))
 
     with gr.Blocks(title="Sauti - AI Chat Assistant", theme=gr.themes.Soft(), css=custom_css) as app:
@@ -859,7 +858,7 @@ def create_app():
             with gr.Column(elem_classes="sidebar"):
                 with gr.Column():
                     kiswahili_toggle = gr.Button(
-                        "📚 Msaidizi wa Kiswahili", variant="primary", size="lg",
+                        "📚 Msaidizi wa CBC", variant="primary", size="lg",
                         elem_classes="toggle-btn kiswahili-active-mode"
                     )
                     general_toggle = gr.Button(
@@ -877,21 +876,9 @@ def create_app():
 
                 gr.HTML("<div style='margin:1rem 0;border-top:1px solid #e1e5e9;'></div>")
 
+                # ── EDIT 1: Kiswahili sidebar — simple description only ──
                 with gr.Column(visible=True) as kiswahili_sidebar:
-                    gr.HTML('<div class="sidebar-title">Quick Questions</div>')
-                    with gr.Column(elem_classes="sidebar-buttons"):
-                        kiswahili_btn1 = gr.Button("Eleza kuhusu Nomino katika Kiswahili", elem_classes="sidebar-btn")
-                        kiswahili_btn2 = gr.Button("Taja aina za Nomino na utoe mifano", elem_classes="sidebar-btn")
-                        kiswahili_btn3 = gr.Button("Fafanua maana ya Vitenzi katika Kiswahili", elem_classes="sidebar-btn")
-                        kiswahili_btn4 = gr.Button("Eleza aina za Vitenzi na utoe mifano", elem_classes="sidebar-btn")
-
-                    gr.HTML("<div style='margin:1rem 0;border-top:1px solid #e1e5e9;'></div>")
-                    gr.HTML('<div class="cbc-info">🌱 <b>Kilimo F1</b><br>Maswali ya haraka:</div>')
-                    with gr.Column(elem_classes="sidebar-buttons"):
-                        cbc_btn1 = gr.Button("Kilimo ni nini?", elem_classes="sidebar-btn")
-                        cbc_btn2 = gr.Button("Taja matawi ya kilimo", elem_classes="sidebar-btn")
-                        cbc_btn3 = gr.Button("Eleza mifumo ya kilimo", elem_classes="sidebar-btn")
-                        cbc_btn4 = gr.Button("Umuhimu wa kilimo ni nini?", elem_classes="sidebar-btn")
+                    pass
 
                 with gr.Column(visible=False) as general_sidebar:
                     gr.HTML('<div class="sidebar-title">Quick Questions</div>')
@@ -928,9 +915,10 @@ def create_app():
                 # ── Kiswahili Container ──────────────────────────
                 with gr.Column(visible=True, elem_classes=["chat-container", "kiswahili-active"]) as kiswahili_container:
 
+                    # ── EDIT 2: All tabs at same level, no CBC wrapper ──
                     with gr.Tabs() as kiswahili_tabs:
 
-                        # ── Tab 1: Literature Chat ───────────────
+                        # ── Msaidizi wa Fasihi ───────────────────
                         with gr.Tab("💬 Msaidizi wa Fasihi"):
                             kiswahili_chatbot = gr.Chatbot(
                                 height=300,
@@ -948,26 +936,28 @@ def create_app():
                             confidence_display = gr.HTML(
                                 value="<div style='text-align:center;padding:10px;'>Confidence will appear here after response</div>"
                             )
-
-                        # ── FIX 2: Tab 2 — CBC Mtaala (clean, no old code below) ──
-                        with gr.Tab("🌱 Mtaala wa CBC"):
+                            # ── Quick questions at bottom of this tab ──
                             gr.HTML("""
-                            <div style='background:linear-gradient(135deg,#2d6a4f,#40916c);
-                                        padding:1.2rem 1.5rem;border-radius:12px;color:white;margin-bottom:1rem;'>
-                                <h4 style='margin:0;font-family:Playfair Display,serif;font-size:1.1rem;'>
-                                    🌱 Mtaala wa CBC
-                                </h4>
-                                <p style='margin:0.2rem 0 0;opacity:0.85;font-size:0.85rem;'>
-                                    Masomo yote kwa Kiswahili
-                                </p>
+                            <div style='margin-top:1rem;padding-top:1rem;border-top:1px solid #e1e5e9;
+                                        font-size:13px;color:#555;margin-bottom:0.5rem;'>
+                                ⚡ Maswali ya haraka:
                             </div>
                             """)
+                            with gr.Row():
+                                kiswahili_btn1 = gr.Button("Nomino ni nini?", size="sm")
+                                kiswahili_btn2 = gr.Button("Aina za Nomino", size="sm")
+                                kiswahili_btn3 = gr.Button("Vitenzi ni nini?", size="sm")
+                                kiswahili_btn4 = gr.Button("Aina za Vitenzi", size="sm")
 
-                            with gr.Tabs():
-                                for key in CBC_REGISTRY:
-                                    chapter = cbc_manager.get(key)
-                                    with gr.Tab(f"{chapter.config['emoji']} {chapter.config['subject']} {chapter.config['form']}"):
-                                        build_cbc_subject_tab(chapter)
+                        # ── CBC Subject Tabs ─────────────────────
+                        with gr.Tab("🌱 Kilimo"):
+                            build_cbc_subject_tab(cbc_manager.get("kilimo_f1"))
+
+                        with gr.Tab("🔬 Biolojia"):
+                            build_cbc_subject_tab(cbc_manager.get("biolojia_f1"))
+
+                        with gr.Tab("⚗️ Kemia"):
+                            build_cbc_subject_tab(cbc_manager.get("kemia_f1"))
 
                 # ── General Chat ─────────────────────────────────
                 with gr.Column(visible=False, elem_classes=["chat-container", "general-active"]) as general_container:
@@ -1214,25 +1204,6 @@ def create_app():
         library_toggle.click(show_library, outputs=toggle_outputs)
 
         # ════════════════════════════════════════════════════════
-        # FIX 3: CBC WIRING — sidebar quick buttons only
-        # (reader/Q&A wiring is handled inside build_cbc_subject_tab)
-        # ════════════════════════════════════════════════════════
-        kilimo_chapter = cbc_manager.get("kilimo_f1")
-
-        def cbc_sidebar_ask(query, history):
-            if history is None:
-                history = []
-            result = kilimo_chapter.answer(query, verbose=True)
-            history.append({"role": "user", "content": query})
-            history.append({"role": "assistant", "content": result["response"]})
-            return history
-
-        # Note: sidebar buttons can't directly wire to build_cbc_subject_tab's
-        # internal chatbot. Best UX is to remove the sidebar CBC buttons,
-        # since the tab itself has quick question buttons built in.
-        # They are kept here as visual indicators only — no wiring needed.
-
-        # ════════════════════════════════════════════════════════
         # MAKTABA WIRING
         # ════════════════════════════════════════════════════════
         reader_outputs = [book_list_panel, reader_panel, page_display, book_title_display, page_info, current_book_text, current_page]
@@ -1299,51 +1270,7 @@ if __name__ == "__main__":
     except Exception:
         pass
 
-    # =============================
-    # BACKEND TEST RUNNER
-    # =============================
-    def run_backend_tests():
-        test_queries = [
-            "Gavana wa Mombasa wa sasa ni nani?",
-            "Idadi ya watu nchini Kenya inakadiriwa kuwa kiasi gani kufikia katikati ya mwaka 2025?",
-            "Unadhani ni mji upi unaovutia zaidi kati ya Mombasa na Dar es Salaam kwa mtalii?",
-            "hesabu ni somo nzuri?",
-            "andika shairi fupi kuhusu bahari",
-            "Eleza kuhusu AI kwa kifupi",
-            "Nieleze kuhusu mkutano wa Nairobi AI Forum wa Februari 2026.",
-        ]
-
-        print("\n" + "="*70)
-        print("🚀 BACKEND TEST RUN — SWAHILI-GEMMA RAG SYSTEM")
-        print("="*70)
-
-        kb_test = WikipediaKnowledgeBase()
-        tavily_test = TavilyRetriever()
-        ddg_test = DuckDuckGoRetriever()
-
-        for i, query in enumerate(test_queries, 1):
-            print(f"\n📝 Query {i}: {query}")
-            print("-"*60)
-            try:
-                response, sources = generate_with_rag(
-                    query, kb_test, tavily_test, ddg_test,
-                    show_context=True
-                )
-                print(f"\n💬 Final Answer: {response}")
-                if sources:
-                    print("\n📚 Sources:")
-                    for s in sources:
-                        lang = " (Swahili)" if s.get('language') == 'sw' else ""
-                        print(f"   • {s['title']}{lang}: {s['url']}")
-            except Exception as e:
-                print(f"\n❌ ERROR: {e}")
-            print("-"*60)
-
-        print("\n" + "="*70)
-        print("✅ Backend tests complete")
-        print("="*70)
-
-    run_backend_tests()
+    
 
     print("Creating Gradio app...")
     app = create_app()
