@@ -338,6 +338,7 @@ class TavilyRetriever:
                 "search_depth": "basic",
                 "max_results": max_results,
                 "include_answer": True,
+                "exclude_domains": ["facebook.com", "instagram.com", "twitter.com", "tiktok.com"],
             
             
             }, timeout=12)
@@ -552,6 +553,8 @@ class GeneralChatbot:
         self.ddg = DuckDuckGoRetriever()
     def generate_response(self, message: str):
         return generate_with_rag(message, self.kb, self.tavily, self.ddg, show_context=True)
+
+
 # =============================
 # KIKUYU TRANSCRIBER
 # =============================
@@ -565,7 +568,6 @@ class KikuyuTranscriber:
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
         variants = [
-            
             f"omniASR_LLM_{model_size}",
             f"omniASR_LLM_{model_size}_v2",
         ]
@@ -592,6 +594,21 @@ class KikuyuTranscriber:
         self.is_llm = "LLM" in self.model_card
         print(f"Model type: {'LLM (supports lang)' if self.is_llm else 'CTC (zero-shot, no lang)'}")
 
+        # Load DeepFilterNet once
+        print("Loading DeepFilterNet...")
+        from df.enhance import enhance, init_df
+        self.df_model, self.df_state, _ = init_df()
+        self.df_enhance = enhance
+        print(f"✅ DeepFilterNet loaded on {next(self.df_model.parameters()).device}")
+
+        # Load Silero VAD once
+        print("Loading Silero VAD...")
+        from silero_vad import load_silero_vad, read_audio, get_speech_timestamps
+        self.vad_model = load_silero_vad()
+        self.read_audio = read_audio
+        self.get_speech_timestamps = get_speech_timestamps
+        print("✅ Silero VAD loaded")
+
     def download_youtube_audio(self, url):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_path = self.audio_dir / f"audio_{timestamp}.wav"
@@ -602,7 +619,7 @@ class KikuyuTranscriber:
             'quiet': False,
             'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
             'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.91 Mobile Safari/537.36',
+                'User-Agent': 'Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.91 Mobile Safari/537.36',
             },
             'retries': 3,
             'fragment_retries': 3,
@@ -614,8 +631,85 @@ class KikuyuTranscriber:
         print(f"Downloaded: {title} ({duration}s)")
         return output_path, title, duration
 
-    def split_audio_into_chunks(self, audio_path, max_sec=30):
-        audio = AudioSegment.from_wav(audio_path)
+    def enhance_audio(self, audio_path):
+        audio, sr = torchaudio.load(str(audio_path))
+        max_val = torch.max(torch.abs(audio))
+        if max_val > 0:
+            audio = audio / max_val
+        enhanced = self.df_enhance(self.df_model, self.df_state, audio)
+        enhanced_path = str(audio_path).replace(".wav", "_enhanced.wav")
+        torchaudio.save(enhanced_path, enhanced, sr)
+        print(f"✅ Audio enhanced with DeepFilterNet: {enhanced_path}")
+        return Path(enhanced_path)
+
+    def remove_repetitions(self, text: str) -> str:
+        sentences = text.split()
+        seen = []
+        i = 0
+        while i < len(sentences):
+            phrase_len = 3
+            phrase = tuple(sentences[i:i+phrase_len])
+            if len(seen) >= phrase_len and tuple(seen[-phrase_len:]) == phrase:
+                break
+            seen.append(sentences[i])
+            i += 1
+        return " ".join(seen)
+
+    def split_audio_into_chunks(self, audio_path, max_sec=25):
+        PREROLL_MS = 200
+        sample_rate = 16000
+        preroll_samples = int(PREROLL_MS * sample_rate / 1000)
+
+        wav = self.read_audio(str(audio_path))
+        speech_timestamps = self.get_speech_timestamps(
+            wav, self.vad_model,
+            return_seconds=False,
+            threshold=0.4
+        )
+
+        speech_timestamps = sorted(speech_timestamps, key=lambda x: x['start'])
+
+        if not speech_timestamps:
+            print("⚠️ No speech detected — falling back to fixed chunking")
+            return self._fixed_chunks(audio_path, max_sec)
+
+        audio = AudioSegment.from_wav(str(audio_path))
+        chunks = []
+        temp_files = []
+        current_start = speech_timestamps[0]['start']
+        current_end = speech_timestamps[0]['end']
+
+        for ts in speech_timestamps[1:]:
+            segment_duration = (ts['end'] - current_start) / sample_rate
+            if segment_duration <= max_sec:
+                current_end = ts['end']
+            else:
+                start_ms = max(0, int((current_start - preroll_samples) / sample_rate * 1000))
+                end_ms = int(current_end / sample_rate * 1000)
+                chunk = audio[start_ms:end_ms]
+                chunk = chunk.set_frame_rate(16000).set_channels(1)
+                with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
+                    chunk.export(tmp.name, format="wav")
+                    chunks.append(tmp.name)
+                    temp_files.append(tmp.name)
+                current_start = ts['start']
+                current_end = ts['end']
+
+        # Export last chunk
+        start_ms = max(0, int((current_start - preroll_samples) / sample_rate * 1000))
+        end_ms = int(current_end / sample_rate * 1000)
+        chunk = audio[start_ms:end_ms]
+        chunk = chunk.set_frame_rate(16000).set_channels(1)
+        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
+            chunk.export(tmp.name, format="wav")
+            chunks.append(tmp.name)
+            temp_files.append(tmp.name)
+
+        print(f"✅ VAD + preroll: {len(speech_timestamps)} segments → {len(chunks)} chunks")
+        return chunks, temp_files
+
+    def _fixed_chunks(self, audio_path, max_sec=25):
+        audio = AudioSegment.from_wav(str(audio_path))
         audio = audio.set_frame_rate(16000).set_channels(1)
         duration_ms = len(audio)
         chunk_ms = max_sec * 1000
@@ -627,42 +721,53 @@ class KikuyuTranscriber:
                 chunk.export(tmp.name, format="wav")
                 temp_files.append(tmp.name)
                 chunks.append(tmp.name)
-        print(f"Split into {len(chunks)} chunks")
+        print(f"Split into {len(chunks)} fixed chunks")
         return chunks, temp_files
 
-    def transcribe_chunk(self, chunk_path, lang="kik_Latn"):
-        duration = len(AudioSegment.from_wav(chunk_path)) / 1000
-        if duration > 40:
-            return "[Chunk too long]"
-        try:
-            kwargs = {}
-            if self.is_llm:
-                kwargs["lang"] = [lang]
-            trans = self.pipeline.transcribe([chunk_path], batch_size=1, **kwargs)
-            return trans[0].strip() if trans else "[Empty]"
-        except Exception as e:
-            return f"[Error: {str(e)[:60]}]"
-
-    def process_video(self, url, lang="kik_Latn"):
+    def process_video(self, url, lang="kik_Latn", enhance=True, use_vad=True):
         audio_file, title, dur = self.download_youtube_audio(url)
         if not audio_file.exists():
             return None
-        chunks, temps = self.split_audio_into_chunks(audio_file)
-        transcriptions = []
-        for chunk in tqdm(chunks, desc="Transcribing"):
-            text = self.transcribe_chunk(chunk, lang)
-            transcriptions.append(text)
+        if enhance:
+            audio_file = self.enhance_audio(audio_file)
+            print("✅ Enhancement: ON")
+        else:
+            print("⚠️ Enhancement: OFF")
+        if use_vad:
+            chunks, temps = self.split_audio_into_chunks(audio_file)
+            print("✅ VAD: ON")
+        else:
+            chunks, temps = self._fixed_chunks(audio_file)
+            print("⚠️ VAD: OFF (fixed chunking)")
+        print(f"Transcribing {len(chunks)} chunks (batch_size=4)...")
+        try:
+            kwargs = {"lang": [lang]} if self.is_llm else {}
+            raw = self.pipeline.transcribe(chunks, batch_size=4, **kwargs)
+            transcriptions = [t.strip() if t else "[Empty]" for t in raw]
+        except Exception as e:
+            print(f"⚠️ Batch transcription failed: {e} — falling back to single chunk mode")
+            transcriptions = []
+            for chunk in tqdm(chunks, desc="Transcribing"):
+                try:
+                    kwargs = {"lang": [lang]} if self.is_llm else {}
+                    trans = self.pipeline.transcribe([chunk], batch_size=1, **kwargs)
+                    transcriptions.append(trans[0].strip() if trans else "[Empty]")
+                except Exception as ce:
+                    transcriptions.append(f"[Error: {str(ce)[:60]}]")
         for t in temps:
             try: os.unlink(t)
             except: pass
         full_text = " ".join(transcriptions)
+        full_text = self.remove_repetitions(full_text)
         result = {
             "title": title,
             "url": url,
             "duration": dur,
             "transcription": full_text,
             "model": self.model_card,
-            "lang": lang if self.is_llm else "zero-shot (CTC)"
+            "lang": lang if self.is_llm else "zero-shot (CTC)",
+            "enhancement": enhance,
+            "vad": use_vad
         }
         safe_title = "".join(c if c.isalnum() else "_" for c in title)[:40]
         out_file = self.output_dir / f"{safe_title}_{datetime.now():%Y%m%d_%H%M}.json"
@@ -671,7 +776,64 @@ class KikuyuTranscriber:
         print(f"Saved: {out_file}")
         return result, full_text, str(out_file)
 
-# =============================
+    def process_file(self, audio_path, lang="kik_Latn", enhance=True, use_vad=True):
+        audio_file = Path(audio_path)
+        if not audio_file.exists():
+            return None
+
+        if enhance:
+            audio_file = self.enhance_audio(audio_file)
+            print("✅ Enhancement: ON")
+        else:
+            print("⚠️ Enhancement: OFF")
+
+        if use_vad:
+            chunks, temps = self.split_audio_into_chunks(audio_file)
+            print("✅ VAD: ON")
+        else:
+            chunks, temps = self._fixed_chunks(audio_file)
+            print("⚠️ VAD: OFF (fixed chunking)")
+
+        print(f"Transcribing {len(chunks)} chunks (batch_size=4)...")
+        try:
+            kwargs = {"lang": [lang]} if self.is_llm else {}
+            raw = self.pipeline.transcribe(chunks, batch_size=4, **kwargs)
+            transcriptions = [t.strip() if t else "[Empty]" for t in raw]
+        except Exception as e:
+            print(f"⚠️ Batch failed: {e} — falling back to single chunk mode")
+            transcriptions = []
+            for chunk in tqdm(chunks, desc="Transcribing"):
+                try:
+                    kwargs = {"lang": [lang]} if self.is_llm else {}
+                    trans = self.pipeline.transcribe([chunk], batch_size=1, **kwargs)
+                    transcriptions.append(trans[0].strip() if trans else "[Empty]")
+                except Exception as ce:
+                    transcriptions.append(f"[Error: {str(ce)[:60]}]")
+
+        for t in temps:
+            try: os.unlink(t)
+            except: pass
+
+        full_text = " ".join(transcriptions)
+        full_text = self.remove_repetitions(full_text)
+
+        result = {
+            "title": audio_file.stem,
+            "duration": "unknown",
+            "transcription": full_text,
+            "model": self.model_card,
+            "lang": lang if self.is_llm else "zero-shot (CTC)",
+            "enhancement": enhance,
+            "vad": use_vad
+        }
+
+        out_file = self.output_dir / f"notes_{datetime.now():%Y%m%d_%H%M}.json"
+        with open(out_file, 'w', encoding='utf-8') as f:
+            json.dump(result, f, ensure_ascii=False, indent=2)
+
+        return result, full_text, str(out_file)
+
+
 # INITIALIZE ALL SYSTEMS
 # =============================
 def initialize_systems():
@@ -876,7 +1038,6 @@ def create_app():
 
                 gr.HTML("<div style='margin:1rem 0;border-top:1px solid #e1e5e9;'></div>")
 
-                # ── EDIT 1: Kiswahili sidebar — simple description only ──
                 with gr.Column(visible=True) as kiswahili_sidebar:
                     pass
 
@@ -914,15 +1075,11 @@ def create_app():
 
                 # ── Kiswahili Container ──────────────────────────
                 with gr.Column(visible=True, elem_classes=["chat-container", "kiswahili-active"]) as kiswahili_container:
-
-                    # ── EDIT 2: All tabs at same level, no CBC wrapper ──
                     with gr.Tabs() as kiswahili_tabs:
 
-                        # ── Msaidizi wa Fasihi ───────────────────
                         with gr.Tab("💬 Msaidizi wa Fasihi"):
                             kiswahili_chatbot = gr.Chatbot(
-                                height=300,
-                                type="messages",
+                                height=300, type="messages",
                                 elem_classes="chatbot-container"
                             )
                             with gr.Row():
@@ -936,7 +1093,6 @@ def create_app():
                             confidence_display = gr.HTML(
                                 value="<div style='text-align:center;padding:10px;'>Confidence will appear here after response</div>"
                             )
-                            # ── Quick questions at bottom of this tab ──
                             gr.HTML("""
                             <div style='margin-top:1rem;padding-top:1rem;border-top:1px solid #e1e5e9;
                                         font-size:13px;color:#555;margin-bottom:0.5rem;'>
@@ -949,7 +1105,6 @@ def create_app():
                                 kiswahili_btn3 = gr.Button("Vitenzi ni nini?", size="sm")
                                 kiswahili_btn4 = gr.Button("Aina za Vitenzi", size="sm")
 
-                        # ── CBC Subject Tabs ─────────────────────
                         with gr.Tab("🌱 Kilimo"):
                             build_cbc_subject_tab(cbc_manager.get("kilimo_f1"))
 
@@ -962,8 +1117,7 @@ def create_app():
                 # ── General Chat ─────────────────────────────────
                 with gr.Column(visible=False, elem_classes=["chat-container", "general-active"]) as general_container:
                     general_chatbot = gr.Chatbot(
-                        height=300,
-                        type="messages",
+                        height=300, type="messages",
                         elem_classes="chatbot-container"
                     )
                     with gr.Row():
@@ -982,45 +1136,98 @@ def create_app():
                 with gr.Column(visible=False, elem_classes=["chat-container", "transcriber-active"]) as transcriber_container:
                     gr.HTML("""
                     <h3 style="font-family:'Playfair Display',serif;color:#6B35A8;margin-bottom:1rem;">
-                        🎙️ African Language YouTube Transcriber
+                        🎙️ African Language Transcriber
                     </h3>
                     """)
-                    with gr.Column(elem_classes="transcriber-panel"):
-                        youtube_url = gr.Textbox(
-                            label="YouTube URL",
-                            placeholder="https://www.youtube.com/watch?v=...",
-                            elem_classes="textbox"
-                        )
-                        lang_code = gr.Textbox(
-                            label="Language Code",
-                            value="kik_Latn",
-                            elem_classes="textbox"
-                        )
-                        with gr.Row():
-                            transcribe_btn = gr.Button(
-                                "🎙️ Transcribe Video", variant="primary", size="lg",
-                                elem_classes="transcriber-btn"
-                            )
-                            transcribe_clear_btn = gr.Button(
-                                "🗑️ Clear", size="lg", elem_classes="transcriber-btn"
-                            )
+                    with gr.Tabs():
 
-                    gr.HTML("<div style='margin:1rem 0;border-top:1px solid #e0d5f5;'></div>")
+                        # ── Tab 1: YouTube Transcriber ────────────
+                        with gr.Tab("🎙️ YouTube Transcriber"):
+                            with gr.Column(elem_classes="transcriber-panel"):
+                                youtube_url = gr.Textbox(
+                                    label="YouTube URL",
+                                    placeholder="https://www.youtube.com/watch?v=...",
+                                    elem_classes="textbox"
+                                )
+                                lang_code = gr.Textbox(
+                                    label="Language Code",
+                                    value="kik_Latn",
+                                    elem_classes="textbox"
+                                )
+                                with gr.Row():
+                                    enhance_toggle = gr.Checkbox(label="🔊 DeepFilterNet Enhancement", value=True)
+                                    vad_toggle = gr.Checkbox(label="🎙️ VAD Segmentation", value=False)
+                                with gr.Row():
+                                    transcribe_btn = gr.Button(
+                                        "🎙️ Transcribe Video", variant="primary", size="lg",
+                                        elem_classes="transcriber-btn"
+                                    )
+                                    transcribe_clear_btn = gr.Button(
+                                        "🗑️ Clear", size="lg", elem_classes="transcriber-btn"
+                                    )
+                            gr.HTML("<div style='margin:1rem 0;border-top:1px solid #e0d5f5;'></div>")
+                            video_title = gr.Textbox(label="Video Title", interactive=False, elem_classes="textbox")
+                            video_duration = gr.Textbox(label="Duration", interactive=False, elem_classes="textbox")
+                            preview_text = gr.Textbox(
+                                label="Preview (first 600 chars)", lines=5,
+                                interactive=False, elem_classes="textbox"
+                            )
+                            full_text = gr.Textbox(
+                                label="Full Transcription", lines=10,
+                                interactive=False, elem_classes="textbox"
+                            )
+                            transcription_status = gr.HTML(
+                                value="<div style='text-align:center;padding:10px;color:#888;'>Ready to transcribe</div>"
+                            )
+                            json_download = gr.File(label="📥 Download JSON", visible=False)
 
-                    video_title = gr.Textbox(label="Video Title", interactive=False, elem_classes="textbox")
-                    video_duration = gr.Textbox(label="Duration", interactive=False, elem_classes="textbox")
-                    preview_text = gr.Textbox(
-                        label="Preview (first 600 chars)", lines=5,
-                        interactive=False, elem_classes="textbox"
-                    )
-                    full_text = gr.Textbox(
-                        label="Full Transcription", lines=10,
-                        interactive=False, elem_classes="textbox"
-                    )
-                    transcription_status = gr.HTML(
-                        value="<div style='text-align:center;padding:10px;color:#888;'>Ready to transcribe</div>"
-                    )
-                    json_download = gr.File(label="📥 Download JSON", visible=False)
+                        # ── Tab 2: AI Notetaker ───────────────────
+                        with gr.Tab("📝 AI Notetaker"):
+                            gr.HTML("""
+                            <p style="color:#888;margin-bottom:1rem;">Record a lecture or paste a YouTube link, get structured notes instantly.</p>
+                            """)
+                            with gr.Column(elem_classes="transcriber-panel"):
+                                gr.HTML("<b style='color:#6B35A8;'>Option 1: Record or Upload Audio</b>")
+                                mic_audio = gr.Audio(
+                                    sources=["microphone", "upload"],
+                                    type="filepath",
+                                    format="wav",
+                                    label="🎙️ Record or Upload Lecture Audio"
+                                )
+                                mic_audio_state = gr.State(None)
+                                gr.HTML("<div style='margin:1rem 0;border-top:1px solid #e0d5f5;'></div>")
+                                gr.HTML("<b style='color:#6B35A8;'>Option 2: YouTube URL</b>")
+                                notes_youtube_url = gr.Textbox(
+                                    label="YouTube URL",
+                                    placeholder="https://www.youtube.com/watch?v=...",
+                                    elem_classes="textbox"
+                                )
+                                with gr.Row():
+                                    notes_lang = gr.Dropdown(
+                                        choices=[("Swahili", "swa_Latn"), ("English", "eng_Latn")],
+                                        value="swa_Latn",
+                                        label="🌍 Transcription Language"
+                                    )
+                                    notes_output_lang = gr.Radio(
+                                        choices=["English", "Swahili"],
+                                        value="English",
+                                        label="📄 Notes Language"
+                                    )
+                                notes_btn = gr.Button(
+                                    "📝 Generate Notes", variant="primary", size="lg",
+                                    elem_classes="transcriber-btn"
+                                )
+                            notes_status = gr.HTML(
+                                value="<div style='text-align:center;padding:10px;color:#888;'>Ready</div>"
+                            )
+                            notes_transcript = gr.Textbox(
+                                label="📜 Transcript", lines=5,
+                                interactive=False, elem_classes="textbox"
+                            )
+                            notes_output = gr.Textbox(
+                                label="📝 Structured Notes", lines=15,
+                                interactive=False, elem_classes="textbox"
+                            )
 
                 # ── Maktaba ──────────────────────────────────────
                 with gr.Column(visible=False, elem_classes=["chat-container", "library-active"]) as library_container:
@@ -1114,16 +1321,37 @@ def create_app():
             chat_history.append({"role": "assistant", "content": response})
             return "", chat_history, src_html
 
-        def run_transcription(url, lang):
+        def run_transcription(url, lang, enhance, use_vad):
             if not url.strip():
                 return ("", "", "", "", "<div style='color:#e74c3c;text-align:center;'>Please enter a YouTube URL</div>", gr.update(visible=False))
             try:
-                result, full, json_path = kikuyu_transcriber.process_video(url.strip(), lang.strip())
+                result, full, json_path = kikuyu_transcriber.process_video(
+                    url.strip(),
+                    lang.strip(),
+                    enhance=enhance,
+                    use_vad=use_vad
+                )
                 preview = full[:600] + "..." if len(full) > 600 else full
                 status_html = f"""
                 <div style='text-align:center;padding:10px;background:#f0ebff;border-radius:8px;color:#5a3a8a;'>
-                    ✅ Transcription complete | Model: <b>{result['model']}</b> | Lang: <b>{result['lang']}</b>
-                </div>"""
+                    ✅ Transcription complete | Model: <b>{result['model']}</b> | Lang: <b>{result['lang']}</b> |
+                    Enhancement: <b>{'ON' if enhance else 'OFF'}</b> | VAD: <b>{'ON' if use_vad else 'OFF'}</b>
+                </div>
+                <script>
+                    (function() {{
+                        var script = document.createElement('script');
+                        script.src = 'https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js';
+                        script.onload = function() {{
+                            confetti({{
+                                particleCount: 150,
+                                spread: 80,
+                                origin: {{ y: 0.6 }},
+                                colors: ['#6B35A8', '#B8651B', '#C9A84C', '#1F5D4F', '#ffffff']
+                            }});
+                        }};
+                        document.head.appendChild(script);
+                    }})();
+                </script>"""
                 return (result["title"], f"{result['duration']} seconds", preview, full, status_html, gr.update(value=json_path, visible=True))
             except Exception as e:
                 error_html = f"<div style='color:#e74c3c;text-align:center;padding:10px;'>❌ Error: {str(e)}</div>"
@@ -1131,6 +1359,76 @@ def create_app():
 
         def clear_transcription():
             return ("", "", "", "", "<div style='text-align:center;padding:10px;color:#888;'>Ready to transcribe</div>", gr.update(visible=False))
+
+        def generate_notes(audio_path, youtube_url, lang, notes_lang):
+            print(f"DEBUG audio_path: {audio_path} | youtube_url: {youtube_url}")
+            
+            # Determine source
+            if youtube_url and youtube_url.strip():
+                try:
+                    result, full_text, _ = kikuyu_transcriber.process_video(
+                        youtube_url.strip(), lang, enhance=True, use_vad=False
+                    )
+                except Exception as e:
+                    return "", "", f"<div style='color:#e74c3c;text-align:center;padding:10px;'>❌ YouTube Error: {str(e)}</div>"
+            elif audio_path:
+                try:
+                    result, full_text, _ = kikuyu_transcriber.process_file(
+                        audio_path, lang=lang, enhance=True, use_vad=False
+                    )
+                except Exception as e:
+                    return "", "", f"<div style='color:#e74c3c;text-align:center;padding:10px;'>❌ Audio Error: {str(e)}</div>"
+            else:
+                return "", "", "<div style='color:#e74c3c;text-align:center;padding:10px;'>Please record audio or paste a YouTube URL</div>"
+
+            if notes_lang == "Swahili":
+                prompt = f"""Piga muhtasari wa mazungumzo haya ya darasa kwa Kiswahili. Toa muundo huu:
+
+## Muhtasari
+...
+
+## Mawazo Makuu
+- ...
+
+## Maneno Muhimu na Maana Yake
+- neno: maana
+
+## Mifano
+- ...
+
+Mazungumzo:
+{full_text}"""
+            else:
+                prompt = f"""Summarize this lecture transcript and generate structured notes in English:
+
+## Summary
+...
+
+## Key Ideas
+- ...
+
+## Definitions
+- term: definition
+
+## Examples
+- ...
+
+Transcript:
+{full_text}"""
+
+            response = groq_client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=1000
+            )
+            notes = response.choices[0].message.content
+            lang_display = "Swahili" if lang == "swa_Latn" else "English"
+            status_html = f"""
+            <div style='text-align:center;padding:10px;background:#f0ebff;border-radius:8px;color:#5a3a8a;'>
+                ✅ Notes generated | Transcription: <b>{lang_display}</b> | Notes: <b>{notes_lang}</b>
+            </div>"""
+            return full_text, notes, status_html
+            
 
         def open_book(filename, title, author):
             text = load_book_text(filename)
@@ -1152,7 +1450,6 @@ def create_app():
 
         def back_to_booklist():
             return gr.update(visible=True), gr.update(visible=False)
-
         # ════════════════════════════════════════════════════════
         # TOGGLE FUNCTIONS
         # ════════════════════════════════════════════════════════
@@ -1231,8 +1528,27 @@ def create_app():
         # TRANSCRIBER WIRING
         # ════════════════════════════════════════════════════════
         transcribe_outputs = [video_title, video_duration, preview_text, full_text, transcription_status, json_download]
-        transcribe_btn.click(run_transcription, [youtube_url, lang_code], transcribe_outputs)
+        transcribe_btn.click(run_transcription, [youtube_url, lang_code, enhance_toggle, vad_toggle], transcribe_outputs)
         transcribe_clear_btn.click(clear_transcription, outputs=transcribe_outputs)
+
+        # ── Notetaker Wiring ─────────────────────────────────
+        mic_audio.change(
+            lambda x: x,
+            inputs=[mic_audio],
+            outputs=[mic_audio_state]
+        )
+        mic_audio.stop_recording(
+            lambda x: x,
+            inputs=[mic_audio],
+            outputs=[mic_audio_state]
+        )
+        notes_btn.click(
+            generate_notes,
+            inputs=[mic_audio_state, notes_youtube_url, notes_lang, notes_output_lang],
+            outputs=[notes_transcript, notes_output, notes_status]
+        )
+
+
 
         # ════════════════════════════════════════════════════════
         # QUICK ACTION BUTTONS
@@ -1269,8 +1585,6 @@ if __name__ == "__main__":
             torch.backends.cudnn.allow_tf32 = True
     except Exception:
         pass
-
-    
 
     print("Creating Gradio app...")
     app = create_app()
