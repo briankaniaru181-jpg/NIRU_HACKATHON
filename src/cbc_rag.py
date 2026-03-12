@@ -464,7 +464,7 @@ def build_cbc_subject_tab(chapter: CBCChapter):
 if __name__ == "__main__":
     from kaggle_secrets import UserSecretsClient
     secrets = UserSecretsClient()
-    genai.configure(api_key=secrets.get_secret("GEMINI_API_KEY"))
+    genai.configure(api_key=secrets.get_secret("GOOGLE_API_KEY"))
     gemini_client = genai.GenerativeModel("gemini-3.1-flash-lite-preview")
 
     manager = CBCManager(gemini_client=gemini_client)
