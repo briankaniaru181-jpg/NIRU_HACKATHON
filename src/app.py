@@ -25,9 +25,9 @@ import faiss
 from pydub import AudioSegment
 from tqdm import tqdm
 import yt_dlp
+import google.generativeai as genai
 from omnilingual_asr.models.inference.pipeline import ASRInferencePipeline
 from kaggle_secrets import UserSecretsClient
-from groq import Groq
 from cbc_rag import CBCChapter, CBCManager, build_cbc_subject_tab, CBC_REGISTRY
 import base64
 
@@ -36,7 +36,8 @@ import base64
 # =============================
 secrets = UserSecretsClient()
 os.environ["TAVILY_API_KEY"] = secrets.get_secret("TAVILY_API_KEY")
-groq_client = Groq(api_key=secrets.get_secret("GROQ_API_KEY"))
+genai.configure(api_key=secrets.get_secret("GEMINI_API_KEY"))
+gemini_client = genai.GenerativeModel("gemini-3.1-flash-lite-preview")
 
 print("All imports successful")
 
@@ -1416,12 +1417,8 @@ Mazungumzo:
 Transcript:
 {full_text}"""
 
-            response = groq_client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=1000
-            )
-            notes = response.choices[0].message.content
+            response = gemini_client.generate_content(prompt)
+            notes = response.text
             lang_display = "Swahili" if lang == "swa_Latn" else "English"
             status_html = f"""
             <div style='text-align:center;padding:10px;background:#f0ebff;border-radius:8px;color:#5a3a8a;'>
