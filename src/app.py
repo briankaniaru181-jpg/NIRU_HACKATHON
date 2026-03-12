@@ -1149,9 +1149,32 @@ def create_app():
                                     placeholder="https://www.youtube.com/watch?v=...",
                                     elem_classes="textbox"
                                 )
-                                lang_code = gr.Textbox(
-                                    label="Language Code",
+                                lang_code = gr.Dropdown(
+                                    choices=[
+                                        ("Kikuyu", "kik_Latn"),
+                                        ("Swahili", "swa_Latn"),
+                                        ("English", "eng_Latn"),
+                                        ("English (Kenyan)", "eng_Latn"),
+                                        ("Maragoli", "rag_Latn"),
+                                        ("Lumarachi", "lri_Latn"),
+                                        ("Kipsigis", "sgc_Latn"),
+                                        ("Nandi", "pko_Latn"),
+                                        ("Maasai", "mas_Latn"),
+                                        ("Somali", "som_Latn"),
+                                        ("Embu", "ebu_Latn"),
+                                        ("Turkana", "tuv_Latn"),
+                                        ("Gusii", "guz_Latn"),
+                                        ("Suba", "sxb_Latn"),
+                                        ("Bukusu", "bxk_Latn"),
+                                        ("Kalenjin", "kln_Latn"),
+                                        ("Luo", "luo_Latn"),
+                                        ("Luhya", "luy_Latn"),
+                                        ("Kamba", "kam_Latn"),
+                                        ("Somali", "som_Latn"),
+                                        ("Meru", "mer_Latn"),
+                                    ],
                                     value="kik_Latn",
+                                    label="🌍 Language Code",
                                     elem_classes="textbox"
                                 )
                                 with gr.Row():
@@ -1204,7 +1227,27 @@ def create_app():
                                 )
                                 with gr.Row():
                                     notes_lang = gr.Dropdown(
-                                        choices=[("Swahili", "swa_Latn"), ("English", "eng_Latn"), ("Kikuyu", "kik_Latn"), ("Kalenjin", "kln_Latn"), ("Luo", "luo_Latn"), ("Luhya", "luy_Latn"), ("Kamba", "kam_Latn"), ("Somali", "som_Latn"), ("Meru", "mer_Latn"),],
+                                        choices=[
+                                            ("Kikuyu", "kik_Latn"),
+                                            ("Swahili", "swa_Latn"),
+                                            ("English (Kenyan)", "eng_Latn"),
+                                            ("Luo", "luo_Latn"),
+                                            ("Luhya", "luy_Latn"),
+                                            ("Lulogooli", "rag_Latn"),
+                                            ("Lubukusu", "bxk_Latn"),
+                                            ("Lumarachi", "lri_Latn"),
+                                            ("Kalenjin", "kln_Latn"),
+                                            ("Kipsigis", "sgc_Latn"),
+                                            ("Nandi", "pko_Latn"),
+                                            ("Kamba", "kam_Latn"),
+                                            ("Maasai", "mas_Latn"),
+                                            ("Somali", "som_Latn"),
+                                            ("Meru", "mer_Latn"),
+                                            ("Embu", "ebu_Latn"),
+                                            ("Turkana", "tuv_Latn"),
+                                            ("Gusii", "guz_Latn"),
+                                            ("Suba", "sxb_Latn"),
+                                        ],
                                         value="swa_Latn",
                                         label="🌍 Transcription Language"
                                     )
