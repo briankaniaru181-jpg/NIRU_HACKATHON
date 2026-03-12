@@ -1204,7 +1204,7 @@ def create_app():
                                 )
                                 with gr.Row():
                                     notes_lang = gr.Dropdown(
-                                        choices=[("Swahili", "swa_Latn"), ("English", "eng_Latn")],
+                                        choices=[("Swahili", "swa_Latn"), ("English", "eng_Latn"), ("Kikuyu", "kik_Latn"), ("Kalenjin", "kln_Latn"), ("Luo", "luo_Latn"), ("Luhya", "luy_Latn"), ("Kamba", "kam_Latn"), ("Somali", "som_Latn"), ("Meru", "mer_Latn"),],
                                         value="swa_Latn",
                                         label="🌍 Transcription Language"
                                     )
@@ -1382,39 +1382,47 @@ def create_app():
                 return "", "", "<div style='color:#e74c3c;text-align:center;padding:10px;'>Please record audio or paste a YouTube URL</div>"
 
             if notes_lang == "Swahili":
-                prompt = f"""Piga muhtasari wa mazungumzo haya ya darasa kwa Kiswahili. Toa muundo huu:
+                prompt = f"""Hii ni nakala ya hotuba iliyorekodiwa. Inaweza kuwa katika lugha yoyote ya Kenya (Kikuyu, Kalenjin, Luo, Luhya, Kamba, n.k.).
+            Tafsiri na piga muhtasari kwa Kiswahili. Toa muundo huu:
 
-## Muhtasari
-...
+            ## Tafsiri Kamili
+            (Tafsiri nzima ya nakala kwa Kiswahili, neno kwa neno)
 
-## Mawazo Makuu
-- ...
+            ## Muhtasari
+            ...
 
-## Maneno Muhimu na Maana Yake
-- neno: maana
+            ## Mawazo Makuu
+            - ...
 
-## Mifano
-- ...
+            ## Maneno Muhimu na Maana Yake
+            - neno: maana
 
-Mazungumzo:
-{full_text}"""
+            ## Mifano
+            - ...
+
+            Nakala:
+            {full_text}"""
             else:
-                prompt = f"""Summarize this lecture transcript and generate structured notes in English:
+                prompt = f"""This is a transcript that may be in any Kenyan language (Kikuyu, Kalenjin, Luo, Luhya, Kamba, etc.).
+            Translate and summarize it in English. Generate structured notes:
 
-## Summary
-...
+            ## Verbatim Translation
+            (Full word-for-word translation of the transcript into English)
 
-## Key Ideas
-- ...
+            ## Summary
+            ...
 
-## Definitions
-- term: definition
+            ## Key Ideas
+            - ...
 
-## Examples
-- ...
+            ## Definitions
+            - term: definition
 
-Transcript:
-{full_text}"""
+            ## Examples
+            - ...
+
+            Transcript:
+            {full_text}"""
 
             response = gemini_client.generate_content(prompt)
             notes = response.text
