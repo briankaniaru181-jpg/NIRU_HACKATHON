@@ -435,21 +435,20 @@ def should_use_rag(query: str, confidence_threshold: float = 0.68) -> Tuple[bool
 
 def hybrid_generate(prompt: str, context: str, query: str) -> str:
     if context.strip():
-        print(" 🌐 Context available — using Groq directly...")
+        print(" 🌐 Context available — using Gemini directly...")
         try:
-            response = groq_client.chat.completions.create(
-                messages=[
-                    {"role": "system", "content": "Wewe ni msaidizi wa Kiswahili. Tumia TAARIFA zilizotolewa PEKEE. Jibu kwa Kiswahili. Maneno 50-200 tu."},
-                    {"role": "user", "content": f"TAARIFA:\n{context[:2500]}\n\nSWALI: {query}\nJIBU:"}
-                ],
-                model="llama-3.3-70b-versatile",
+            gemini_prompt = (
+                "Wewe ni msaidizi wa Kiswahili. Tumia TAARIFA zilizotolewa PEKEE. "
+                "Jibu kwa Kiswahili. Maneno 50-200 tu.\n\n"
+                f"TAARIFA:\n{context[:2500]}\n\nSWALI: {query}\nJIBU:"
             )
-            result = response.choices[0].message.content
+            response = gemini_client.generate_content(gemini_prompt)
+            result = response.text
             if result and result.strip():
-                print(" ✅ Groq successful")
+                print(" ✅ Gemini successful")
                 return result.strip()
         except Exception as e:
-            print(f" ⚠️ Groq failed: {e}")
+            print(f" ⚠️ Gemini failed: {e}")
 
     # Fallback to local model if Groq fails or no context
     print(" 🔄 Falling back to local model...")
@@ -991,7 +990,7 @@ def create_app():
     with open(logo_path, "rb") as img_file:
         logo_base64 = base64.b64encode(img_file.read()).decode()
 
-    cbc_manager = CBCManager(groq_api_key=secrets.get_secret("GROQ_API_KEY"))
+    cbc_manager = CBCManager(gemini_client=gemini_client)
 
     with gr.Blocks(title="Sauti - AI Chat Assistant", theme=gr.themes.Soft(), css=custom_css) as app:
 
