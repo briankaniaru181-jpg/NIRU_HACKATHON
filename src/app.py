@@ -36,7 +36,7 @@ import base64
 # =============================
 secrets = UserSecretsClient()
 os.environ["TAVILY_API_KEY"] = secrets.get_secret("TAVILY_API_KEY")
-genai.configure(api_key=secrets.get_secret("GEMINI_API_KEY"))
+genai.configure(api_key=secrets.get_secret("GOOGLE_API_KEY"))
 gemini_client = genai.GenerativeModel("gemini-3.1-flash-lite-preview")
 
 print("All imports successful")
