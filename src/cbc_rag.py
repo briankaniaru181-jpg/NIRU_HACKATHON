@@ -13,7 +13,7 @@ To add a new subject: just add a URL to CBC_REGISTRY. Nothing else changes.
 
 import requests
 from bs4 import BeautifulSoup, NavigableString
-from groq import Groq
+import google.generativeai as genai
 import re
 from typing import Tuple, Optional, Dict
 import os
@@ -199,17 +199,15 @@ class CBCChapter:
 
     WORDS_PER_PAGE = 150
 
-    def __init__(self, groq_api_key: str, subject_key: str,
-                 groq_model: str = "llama-3.3-70b-versatile"):
+    def __init__(self, gemini_client, subject_key: str):
         if subject_key not in CBC_REGISTRY:
-            raise ValueError(f"Subject '{subject_key}' not found in CBC_REGISTRY. "
-                             f"Available: {list(CBC_REGISTRY.keys())}")
+            raise ValueError(f"Subject '{subject_key}' not found in CBC_REGISTRY.")
         self.config = CBC_REGISTRY[subject_key]
         self.subject_key = subject_key
-        self.groq = Groq(api_key=groq_api_key)
-        self.groq_model = groq_model
+        self.gemini = gemini_client
         self._english_cache: str = ""
         self._swahili_cache: str = ""
+        
 
     def get_english_chapter(self, force_refresh: bool = False) -> str:
         if self._english_cache and not force_refresh:
@@ -223,18 +221,10 @@ class CBCChapter:
             return self._swahili_cache
         english = self.get_english_chapter()
         if verbose:
-            print(f"🌍 Translating {self.config['subject']} to Swahili via Groq...")
+            print(f"🌍 Translating {self.config['subject']} to Swahili via Gemini...")
         try:
-            response = self.groq.chat.completions.create(
-                model=self.groq_model,
-                messages=[
-                    {"role": "system", "content": TRANSLATOR_PROMPT},
-                    {"role": "user", "content": english}
-                ],
-                max_tokens=3000,
-                temperature=0.2,
-            )
-            self._swahili_cache = response.choices[0].message.content.strip()
+            response = self.gemini.generate_content(TRANSLATOR_PROMPT + "\n\n" + english)
+            self._swahili_cache = response.text.strip()
             if verbose:
                 print("✅ Translation complete and cached")
         except Exception as e:
@@ -286,20 +276,12 @@ class CBCChapter:
         if verbose:
             print(f"\n🎓 [{self.config['subject']}] Swali: {query}")
         try:
-            response = self.groq.chat.completions.create(
-                model=self.groq_model,
-                messages=[
-                    {"role": "system", "content": TEACHER_PROMPT},
-                    {"role": "user", "content": user_message}
-                ],
-                max_tokens=400,
-                temperature=0.3,
-            )
-            result["response"] = response.choices[0].message.content.strip()
+            response = self.gemini.generate_content(TEACHER_PROMPT + "\n\n" + user_message)
+            result["response"] = response.text.strip()
             if verbose:
                 print(f"💬 Jibu:\n{result['response']}")
         except Exception as e:
-            print(f"⚠️ Groq error: {e}")
+            print(f"⚠️ Gemini error: {e}")
             result["error"] = str(e)
             result["response"] = "Samahani, nimepata hitilafu. Tafadhali jaribu tena."
         return result
@@ -325,14 +307,14 @@ def match_subject(query: str) -> Optional[str]:
 # ================================================================
 class CBCManager:
 
-    def __init__(self, groq_api_key: str):
-        self.groq_api_key = groq_api_key
+    def __init__(self, gemini_client):
+        self.gemini_client = gemini_client
         self._chapters: Dict[str, CBCChapter] = {}
 
     def get(self, subject_key: str) -> CBCChapter:
         if subject_key not in self._chapters:
             self._chapters[subject_key] = CBCChapter(
-                groq_api_key=self.groq_api_key,
+                gemini_client=self.gemini_client,
                 subject_key=subject_key
             )
         return self._chapters[subject_key]
@@ -482,9 +464,10 @@ def build_cbc_subject_tab(chapter: CBCChapter):
 if __name__ == "__main__":
     from kaggle_secrets import UserSecretsClient
     secrets = UserSecretsClient()
-    api_key = secrets.get_secret("GROQ_API_KEY")
+    genai.configure(api_key=secrets.get_secret("GOOGLE_API_KEY"))
+    gemini_client = genai.GenerativeModel("gemini-3.1-flash-lite-preview")
 
-    manager = CBCManager(groq_api_key=api_key)
+    manager = CBCManager(gemini_client=gemini_client)
 
     print("\n" + "="*65)
     print("📚 AVAILABLE SUBJECTS:")

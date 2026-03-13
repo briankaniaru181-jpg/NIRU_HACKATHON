@@ -25,9 +25,9 @@ import faiss
 from pydub import AudioSegment
 from tqdm import tqdm
 import yt_dlp
+import google.generativeai as genai
 from omnilingual_asr.models.inference.pipeline import ASRInferencePipeline
 from kaggle_secrets import UserSecretsClient
-from groq import Groq
 from cbc_rag import CBCChapter, CBCManager, build_cbc_subject_tab, CBC_REGISTRY
 import base64
 
@@ -36,7 +36,8 @@ import base64
 # =============================
 secrets = UserSecretsClient()
 os.environ["TAVILY_API_KEY"] = secrets.get_secret("TAVILY_API_KEY")
-groq_client = Groq(api_key=secrets.get_secret("GROQ_API_KEY"))
+genai.configure(api_key=secrets.get_secret("GOOGLE_API_KEY"))
+gemini_client = genai.GenerativeModel("gemini-3.1-flash-lite-preview")
 
 print("All imports successful")
 
@@ -434,21 +435,20 @@ def should_use_rag(query: str, confidence_threshold: float = 0.68) -> Tuple[bool
 
 def hybrid_generate(prompt: str, context: str, query: str) -> str:
     if context.strip():
-        print(" 🌐 Context available — using Groq directly...")
+        print(" 🌐 Context available — using Gemini directly...")
         try:
-            response = groq_client.chat.completions.create(
-                messages=[
-                    {"role": "system", "content": "Wewe ni msaidizi wa Kiswahili. Tumia TAARIFA zilizotolewa PEKEE. Jibu kwa Kiswahili. Maneno 50-200 tu."},
-                    {"role": "user", "content": f"TAARIFA:\n{context[:2500]}\n\nSWALI: {query}\nJIBU:"}
-                ],
-                model="llama-3.3-70b-versatile",
+            gemini_prompt = (
+                "Wewe ni msaidizi wa Kiswahili. Tumia TAARIFA zilizotolewa PEKEE. "
+                "Jibu kwa Kiswahili. Maneno 50-200 tu.\n\n"
+                f"TAARIFA:\n{context[:2500]}\n\nSWALI: {query}\nJIBU:"
             )
-            result = response.choices[0].message.content
+            response = gemini_client.generate_content(gemini_prompt)
+            result = response.text
             if result and result.strip():
-                print(" ✅ Groq successful")
+                print(" ✅ Gemini successful")
                 return result.strip()
         except Exception as e:
-            print(f" ⚠️ Groq failed: {e}")
+            print(f" ⚠️ Gemini failed: {e}")
 
     # Fallback to local model if Groq fails or no context
     print(" 🔄 Falling back to local model...")
@@ -990,7 +990,7 @@ def create_app():
     with open(logo_path, "rb") as img_file:
         logo_base64 = base64.b64encode(img_file.read()).decode()
 
-    cbc_manager = CBCManager(groq_api_key=secrets.get_secret("GROQ_API_KEY"))
+    cbc_manager = CBCManager(gemini_client=gemini_client)
 
     with gr.Blocks(title="Sauti - AI Chat Assistant", theme=gr.themes.Soft(), css=custom_css) as app:
 
@@ -1149,9 +1149,32 @@ def create_app():
                                     placeholder="https://www.youtube.com/watch?v=...",
                                     elem_classes="textbox"
                                 )
-                                lang_code = gr.Textbox(
-                                    label="Language Code",
+                                lang_code = gr.Dropdown(
+                                    choices=[
+                                        ("Kikuyu", "kik_Latn"),
+                                        ("Swahili", "swa_Latn"),
+                                        ("English", "eng_Latn"),
+                                        ("English (Kenyan)", "eng_Latn"),
+                                        ("Maragoli", "rag_Latn"),
+                                        ("Lumarachi", "lri_Latn"),
+                                        ("Kipsigis", "sgc_Latn"),
+                                        ("Nandi", "pko_Latn"),
+                                        ("Maasai", "mas_Latn"),
+                                        ("Somali", "som_Latn"),
+                                        ("Embu", "ebu_Latn"),
+                                        ("Turkana", "tuv_Latn"),
+                                        ("Gusii", "guz_Latn"),
+                                        ("Suba", "sxb_Latn"),
+                                        ("Bukusu", "bxk_Latn"),
+                                        ("Kalenjin", "kln_Latn"),
+                                        ("Luo", "luo_Latn"),
+                                        ("Luhya", "luy_Latn"),
+                                        ("Kamba", "kam_Latn"),
+                                        ("Somali", "som_Latn"),
+                                        ("Meru", "mer_Latn"),
+                                    ],
                                     value="kik_Latn",
+                                    label="🌍 Language Code",
                                     elem_classes="textbox"
                                 )
                                 with gr.Row():
@@ -1204,7 +1227,27 @@ def create_app():
                                 )
                                 with gr.Row():
                                     notes_lang = gr.Dropdown(
-                                        choices=[("Swahili", "swa_Latn"), ("English", "eng_Latn")],
+                                        choices=[
+                                            ("Kikuyu", "kik_Latn"),
+                                            ("Swahili", "swa_Latn"),
+                                            ("English (Kenyan)", "eng_Latn"),
+                                            ("Luo", "luo_Latn"),
+                                            ("Luhya", "luy_Latn"),
+                                            ("Lulogooli", "rag_Latn"),
+                                            ("Lubukusu", "bxk_Latn"),
+                                            ("Lumarachi", "lri_Latn"),
+                                            ("Kalenjin", "kln_Latn"),
+                                            ("Kipsigis", "sgc_Latn"),
+                                            ("Nandi", "pko_Latn"),
+                                            ("Kamba", "kam_Latn"),
+                                            ("Maasai", "mas_Latn"),
+                                            ("Somali", "som_Latn"),
+                                            ("Meru", "mer_Latn"),
+                                            ("Embu", "ebu_Latn"),
+                                            ("Turkana", "tuv_Latn"),
+                                            ("Gusii", "guz_Latn"),
+                                            ("Suba", "sxb_Latn"),
+                                        ],
                                         value="swa_Latn",
                                         label="🌍 Transcription Language"
                                     )
@@ -1382,46 +1425,50 @@ def create_app():
                 return "", "", "<div style='color:#e74c3c;text-align:center;padding:10px;'>Please record audio or paste a YouTube URL</div>"
 
             if notes_lang == "Swahili":
-                prompt = f"""Piga muhtasari wa mazungumzo haya ya darasa kwa Kiswahili. Toa muundo huu:
+                prompt = f"""Hii ni nakala ya hotuba iliyorekodiwa. Inaweza kuwa katika lugha yoyote ya Kenya (Kikuyu, Kalenjin, Luo, Luhya, Kamba, n.k.).
+            Tafsiri na piga muhtasari kwa Kiswahili. Toa muundo huu:
 
-## Muhtasari
-...
+            ## Tafsiri Kamili
+            (Tafsiri nzima ya nakala kwa Kiswahili, neno kwa neno)
 
-## Mawazo Makuu
-- ...
+            ## Muhtasari
+            ...
 
-## Maneno Muhimu na Maana Yake
-- neno: maana
+            ## Mawazo Makuu
+            - ...
 
-## Mifano
-- ...
+            ## Maneno Muhimu na Maana Yake
+            - neno: maana
 
-Mazungumzo:
-{full_text}"""
+            ## Mifano
+            - ...
+
+            Nakala:
+            {full_text}"""
             else:
-                prompt = f"""Summarize this lecture transcript and generate structured notes in English:
+                prompt = f"""This is a transcript that may be in any Kenyan language (Kikuyu, Kalenjin, Luo, Luhya, Kamba, etc.).
+            Translate and summarize it in English. Generate structured notes:
 
-## Summary
-...
+            ## Verbatim Translation
+            (Full word-for-word translation of the transcript into English)
 
-## Key Ideas
-- ...
+            ## Summary
+            ...
 
-## Definitions
-- term: definition
+            ## Key Ideas
+            - ...
 
-## Examples
-- ...
+            ## Definitions
+            - term: definition
 
-Transcript:
-{full_text}"""
+            ## Examples
+            - ...
 
-            response = groq_client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=1000
-            )
-            notes = response.choices[0].message.content
+            Transcript:
+            {full_text}"""
+
+            response = gemini_client.generate_content(prompt)
+            notes = response.text
             lang_display = "Swahili" if lang == "swa_Latn" else "English"
             status_html = f"""
             <div style='text-align:center;padding:10px;background:#f0ebff;border-radius:8px;color:#5a3a8a;'>
