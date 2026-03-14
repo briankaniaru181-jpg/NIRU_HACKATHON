@@ -1,0 +1,29 @@
+import os
+import requests
+
+os.makedirs("/kaggle/working/icons", exist_ok=True)
+
+icons = {
+    "book-open": "https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/book-open.svg",
+    "globe": "https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/globe.svg",
+    "mic": "https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/mic.svg",
+    "library": "https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/library.svg",
+    "message-circle": "https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/message-circle.svg",
+    "sprout": "https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/sprout.svg",
+    "microscope": "https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/microscope.svg",
+    "flask-conical": "https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/flask-conical.svg",
+    "send": "https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/send.svg",
+    "trash-2": "https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/trash-2.svg",
+    "file-text": "https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/file-text.svg",
+    "download": "https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/download.svg",
+    "zap": "https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/zap.svg",
+}
+
+for name, url in icons.items():
+    r = requests.get(url)
+    if r.status_code == 200:
+        with open(f"/kaggle/working/icons/{name}.svg", "w") as f:
+            f.write(r.text)
+        print(f"✓ Downloaded {name}.svg")
+    else:
+        print(f"✗ Failed {name}.svg — HTTP {r.status_code}")

@@ -17,6 +17,58 @@ import google.generativeai as genai
 import re
 from typing import Tuple, Optional, Dict
 import os
+import base64
+
+
+# ================================================================
+# ICON HELPER
+# Icons are loaded lazily at call time (not at import time), so this
+# module is safe to import before the icon download cell has run.
+# If an icon file is missing, _icon() silently returns "" so the UI
+# still renders — just without the image.
+# ================================================================
+_ICON_DIR = "/kaggle/working/icons"
+_ICON_CACHE: Dict[str, str] = {}
+
+def _icon(name: str, size: int = 16, extra_style: str = "") -> str:
+    """Return an inline <img> tag for a Lucide SVG icon (lazy + cached).
+    Returns empty string if the icon file does not exist yet."""
+    cache_key = f"{name}_{size}_{extra_style}"
+    if cache_key not in _ICON_CACHE:
+        path = os.path.join(_ICON_DIR, f"{name}.svg")
+        if not os.path.exists(path):
+            # Icons not downloaded yet — return empty string, don't crash
+            return ""
+        with open(path, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode()
+        style = f"vertical-align:middle;margin-right:4px;{extra_style}"
+        _ICON_CACHE[cache_key] = (
+            f'<img src="data:image/svg+xml;base64,{b64}" '
+            f'width="{size}" height="{size}" style="{style}" alt="">'
+        )
+    return _ICON_CACHE[cache_key]
+
+def _icon_path(name: str) -> Optional[str]:
+    """Return the SVG file path if it exists, else None.
+    Use for gr.Button(icon=...) — Gradio accepts None gracefully."""
+    path = os.path.join(_ICON_DIR, f"{name}.svg")
+    return path if os.path.exists(path) else None
+
+# Shorthand helpers — all lazy, no file I/O at import time
+def _ico_sprout(size=16):    return _icon("sprout", size)
+def _ico_micro(size=16):     return _icon("microscope", size)
+def _ico_flask(size=16):     return _icon("flask-conical", size)
+def _ico_zap(size=16):       return _icon("zap", size)
+def _ico_book(size=16):      return _icon("book-open", size)
+def _ico_globe(size=16):     return _icon("globe", size)
+def _ico_mic(size=16):       return _icon("mic", size)
+def _ico_send(size=16):      return _icon("send", size)
+def _ico_trash(size=16):     return _icon("trash-2", size)
+def _ico_file(size=16):      return _icon("file-text", size)
+def _ico_download(size=16):  return _icon("download", size)
+def _ico_library(size=16):   return _icon("library", size)
+def _ico_chat(size=16):      return _icon("message-circle", size)
+def _ico_prev(size=16):      return _icon("send", size, "transform:scaleX(-1);")
 
 
 # ================================================================
@@ -27,7 +79,7 @@ CBC_REGISTRY: Dict[str, dict] = {
         "url": "https://opiq.co.ke/kit/78/chapter/3980",
         "subject": "Kilimo",
         "form": "Kidato cha Kwanza",
-        "emoji": "🌱",
+        "icon": "sprout",   # Lucide icon name (replaces emoji)
         "keywords": [
             "kilimo", "agriculture", "mazao", "mifugo", "shamba",
             "zao", "mimea", "mkulima", "wakulima", "genetics",
@@ -45,7 +97,7 @@ CBC_REGISTRY: Dict[str, dict] = {
         "url": "https://opiq.co.ke/kit/36/chapter/1579",
         "subject": "Biolojia",
         "form": "Kidato cha Kwanza",
-        "emoji": "🔬",
+        "icon": "microscope",
         "keywords": [
             "biolojia", "biology", "seli", "mimea", "wanyama",
             "zoology", "botany", "genetics", "ecology", "anatomy",
@@ -62,7 +114,7 @@ CBC_REGISTRY: Dict[str, dict] = {
         "url": "https://opiq.co.ke/kit/37/chapter/1599",
         "subject": "Kemia",
         "form": "Kidato cha Kwanza",
-        "emoji": "⚗️",
+        "icon": "flask-conical",
         "keywords": [
             "kemia", "chemistry", "kemikali", "atomi", "molekuli",
             "asidi", "besi", "mchanganyiko", "oksijeni", "hidrojeni",
@@ -93,7 +145,6 @@ OPIQ_NOISE = {
     "use of cookies", "terms and conditions", "service provided by",
     "in english", "loading", "success", "cancel", "back", "send",
     "remove", "close menu", "error", "close", "nbs!", "nb!", "order",
-    # ── UI chrome fixes ──
     "opiq current location:",
     "current location:",
     "agriculture f1",
@@ -134,9 +185,6 @@ KANUNI:
 # ================================================================
 # FETCHER
 # ================================================================
-# ================================================================
-# FETCHER
-# ================================================================
 def extract_tables(soup):
     tables = soup.find_all("table")
     for table in tables:
@@ -168,8 +216,8 @@ def fetch_opiq_chapter(url: str, max_chars: int = 12000) -> Optional[str]:
                          "header", "button", "form", "iframe", "noscript"]):
             tag.decompose()
         raw_text = soup.get_text(separator="\n", strip=True)
-        raw_text = re.sub(r"([a-z])\n([a-z])", r"\1 \2", raw_text)  # ← before replace
-        raw_text = raw_text.replace("||NEWROW||", "\n")              # ← then replace
+        raw_text = re.sub(r"([a-z])\n([a-z])", r"\1 \2", raw_text)
+        raw_text = raw_text.replace("||NEWROW||", "\n")
         raw_text = re.sub(r"([a-z])([A-Z])", r"\1 \2", raw_text)
         raw_text = raw_text.replace("–", " – ")
         lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
@@ -187,11 +235,13 @@ def fetch_opiq_chapter(url: str, max_chars: int = 12000) -> Optional[str]:
                 continue
             content_lines.append(line)
         cleaned = "\n".join(content_lines)
-        print(f"✅ Fetched {len(cleaned)} chars from Opiq ({url})")
+        print(f"Fetched {len(cleaned)} chars from Opiq ({url})")
         return cleaned[:max_chars]
     except Exception as e:
-        print(f"⚠️ Opiq fetch error: {e}")
+        print(f"Opiq fetch error: {e}")
         return None
+
+
 # ================================================================
 # GENERIC CBC CHAPTER CLASS
 # ================================================================
@@ -207,7 +257,6 @@ class CBCChapter:
         self.gemini = gemini_client
         self._english_cache: str = ""
         self._swahili_cache: str = ""
-        
 
     def get_english_chapter(self, force_refresh: bool = False) -> str:
         if self._english_cache and not force_refresh:
@@ -221,21 +270,19 @@ class CBCChapter:
             return self._swahili_cache
         english = self.get_english_chapter()
         if verbose:
-            print(f"🌍 Translating {self.config['subject']} to Swahili via Gemini...")
+            print(f"Translating {self.config['subject']} to Swahili via Gemini...")
         try:
             response = self.gemini.generate_content(TRANSLATOR_PROMPT + "\n\n" + english)
             self._swahili_cache = response.text.strip()
             if verbose:
-                print("✅ Translation complete and cached")
+                print("Translation complete and cached")
         except Exception as e:
-            print(f"⚠️ Translation error: {e}")
+            print(f"Translation error: {e}")
             self._swahili_cache = "Samahani, tafsiri haikuwezekana. Tafadhali jaribu tena."
         return self._swahili_cache
 
     # ────────────────────────────────────────
     # READER MODE — PAGINATION
-    # Preserves line breaks so headings, paragraphs and lists
-    # display as structured text, not a wall of words.
     # ────────────────────────────────────────
     def get_page(self, text: str, page: int) -> Tuple[str, int, int]:
         lines = text.split("\n")
@@ -274,14 +321,14 @@ class CBCChapter:
             f"JIBU (kwa Kiswahili):"
         )
         if verbose:
-            print(f"\n🎓 [{self.config['subject']}] Swali: {query}")
+            print(f"\n[{self.config['subject']}] Swali: {query}")
         try:
             response = self.gemini.generate_content(TEACHER_PROMPT + "\n\n" + user_message)
             result["response"] = response.text.strip()
             if verbose:
-                print(f"💬 Jibu:\n{result['response']}")
+                print(f"Jibu:\n{result['response']}")
         except Exception as e:
-            print(f"⚠️ Gemini error: {e}")
+            print(f"Gemini error: {e}")
             result["error"] = str(e)
             result["response"] = "Samahani, nimepata hitilafu. Tafadhali jaribu tena."
         return result
@@ -332,7 +379,7 @@ class CBCManager:
     @property
     def available_subjects(self):
         return [
-            f"{config['emoji']} {config['subject']} — {config['form']}"
+            f"{config['subject']} — {config['form']}"
             for config in CBC_REGISTRY.values()
         ]
 
@@ -343,17 +390,18 @@ class CBCManager:
 def build_cbc_subject_tab(chapter: CBCChapter):
     import gradio as gr
     config = chapter.config
+    subject_icon = _icon(config["icon"], 18)
 
     with gr.Column():
         gr.HTML(f"""
         <div style='background:linear-gradient(135deg,#2d6a4f,#40916c);
                     padding:1.2rem 1.5rem;border-radius:12px;color:white;margin-bottom:1rem;'>
             <h4 style='margin:0;font-family:Playfair Display,serif;'>
-                {config['emoji']} {config['subject']} — {config['form']}
+                {subject_icon} {config['subject']} — {config['form']}
             </h4>
             <p style='margin:0.2rem 0 0;opacity:0.85;font-size:0.85rem;'>
                 <a href='{config['url']}' target='_blank' style='color:#a8e6cf;'>
-                    Chanzo: opiq.co.ke ↗
+                    Chanzo: opiq.co.ke &#8599;
                 </a>
             </p>
         </div>
@@ -362,17 +410,17 @@ def build_cbc_subject_tab(chapter: CBCChapter):
         with gr.Tabs():
 
             # ── READER TAB ──────────────────────────────────────
-            with gr.Tab("📖 Soma Sura / Read Chapter"):
+            with gr.Tab("Soma Sura / Read Chapter"):
 
                 lang_toggle = gr.Radio(
-                    choices=["🇬🇧 English", "🇰🇪 Kiswahili"],
-                    value="🇬🇧 English",
+                    choices=["English", "Kiswahili"],
+                    value="English",
                     label="Chagua Lugha / Choose Language",
                     interactive=True
                 )
                 load_status = gr.HTML(
-                    value="<div style='text-align:center;color:#888;font-size:13px;'>"
-                          "⏳ Bonyeza 'Pakia Sura' kupakua kutoka Opiq...</div>"
+                    value=f"<div style='text-align:center;color:#888;font-size:13px;'>"
+                          f"{_ico_download()} Bonyeza 'Pakia Sura' kupakua kutoka Opiq...</div>"
                 )
                 page_display = gr.Textbox(
                     label="", lines=14, interactive=False, value=""
@@ -381,10 +429,14 @@ def build_cbc_subject_tab(chapter: CBCChapter):
                     value="<div style='text-align:center;color:#888;font-size:13px;'>—</div>"
                 )
                 with gr.Row():
-                    prev_btn = gr.Button("⬅️ Iliyopita", size="sm")
-                    load_btn = gr.Button("📥 Pakia Sura", size="sm")
-                    next_btn = gr.Button("Inayofuata ➡️", size="sm")
-                    refresh_btn = gr.Button("🔄 Sasisha", size="sm")
+                    prev_btn = gr.Button("Iliyopita", size="sm",
+                        icon=_icon_path("send"))
+                    load_btn = gr.Button("Pakia Sura", size="sm",
+                        icon=_icon_path("download"))
+                    next_btn = gr.Button("Inayofuata", size="sm",
+                        icon=_icon_path("send"))
+                    refresh_btn = gr.Button("Sasisha", size="sm",
+                        icon=_icon_path("zap"))
 
                 page_state = gr.State(0)
                 text_state = gr.State("")
@@ -393,15 +445,23 @@ def build_cbc_subject_tab(chapter: CBCChapter):
                 def load_chapter():
                     text = chapter.get_english_chapter()
                     pt, pg, total = chapter.get_page(text, 0)
-                    return pt, f"<div style='text-align:center;color:#888;font-size:13px;'>Ukurasa {pg+1}/{total}</div>", \
-                           "<div style='text-align:center;color:#2d6a4f;font-size:13px;'>✅ Imepakiwa kutoka opiq.co.ke</div>", 0, text
+                    return (
+                        pt,
+                        f"<div style='text-align:center;color:#888;font-size:13px;'>Ukurasa {pg+1}/{total}</div>",
+                        f"<div style='text-align:center;color:#2d6a4f;font-size:13px;'>{_ico_zap()} Imepakiwa kutoka opiq.co.ke</div>",
+                        0, text
+                    )
 
                 def change_lang(lang):
                     text = chapter.get_swahili_chapter(verbose=True) if "Kiswahili" in lang else chapter.get_english_chapter()
                     label = "Kiswahili" if "Kiswahili" in lang else "English"
                     pt, pg, total = chapter.get_page(text, 0)
-                    return pt, f"<div style='text-align:center;color:#888;font-size:13px;'>Ukurasa {pg+1}/{total} ({label})</div>", \
-                           "<div style='text-align:center;color:#2d6a4f;font-size:13px;'>✅ Tayari</div>", 0, text
+                    return (
+                        pt,
+                        f"<div style='text-align:center;color:#888;font-size:13px;'>Ukurasa {pg+1}/{total} ({label})</div>",
+                        f"<div style='text-align:center;color:#2d6a4f;font-size:13px;'>{_ico_zap()} Tayari</div>",
+                        0, text
+                    )
 
                 def turn(text, page, direction):
                     if not text:
@@ -412,8 +472,12 @@ def build_cbc_subject_tab(chapter: CBCChapter):
                 def refresh():
                     text = chapter.get_english_chapter(force_refresh=True)
                     pt, pg, total = chapter.get_page(text, 0)
-                    return pt, f"<div style='text-align:center;color:#888;font-size:13px;'>Ukurasa {pg+1}/{total}</div>", \
-                           "<div style='text-align:center;color:#2d6a4f;font-size:13px;'>✅ Imesasishwa</div>", 0, text
+                    return (
+                        pt,
+                        f"<div style='text-align:center;color:#888;font-size:13px;'>Ukurasa {pg+1}/{total}</div>",
+                        f"<div style='text-align:center;color:#2d6a4f;font-size:13px;'>{_ico_zap()} Imesasishwa</div>",
+                        0, text
+                    )
 
                 load_btn.click(load_chapter, outputs=reader_outputs)
                 refresh_btn.click(refresh, outputs=reader_outputs)
@@ -422,16 +486,18 @@ def build_cbc_subject_tab(chapter: CBCChapter):
                 next_btn.click(lambda t, p: turn(t, p, 1), inputs=[text_state, page_state], outputs=[page_display, page_info, page_state])
 
             # ── Q&A TAB ─────────────────────────────────────────
-            with gr.Tab("🎓 Uliza Swali / Ask a Question"):
+            with gr.Tab("Uliza Swali / Ask a Question"):
 
                 chatbot = gr.Chatbot(height=300, type="messages", label=f"Mwalimu wa {config['subject']}")
                 with gr.Row():
                     inp = gr.Textbox(placeholder=f"Uliza swali kuhusu {config['subject']}...", lines=2, scale=4)
                 with gr.Row():
-                    send_btn = gr.Button("✉️ Tuma Swali", variant="primary")
-                    clear_btn = gr.Button("🗑️ Futa")
+                    send_btn = gr.Button("Tuma Swali", variant="primary",
+                        icon=_icon_path("send"))
+                    clear_btn = gr.Button("Futa",
+                        icon=_icon_path("trash-2"))
 
-                gr.HTML("<div style='margin-top:0.8rem;font-size:13px;color:#555;'>⚡ Maswali ya haraka:</div>")
+                gr.HTML(f"<div style='margin-top:0.8rem;font-size:13px;color:#555;'>{_ico_zap()} Maswali ya haraka:</div>")
                 with gr.Row():
                     quick_btns = [gr.Button(q, size="sm") for q in config["quick_questions"]]
 
@@ -447,7 +513,10 @@ def build_cbc_subject_tab(chapter: CBCChapter):
                     result = chapter.answer(query, verbose=True)
                     history.append({"role": "user", "content": query})
                     history.append({"role": "assistant", "content": result["response"]})
-                    status = f"<div style='text-align:center;color:#2d6a4f;font-size:13px;'>✅ Chanzo: opiq.co.ke — {config['subject']} {config['form']}</div>"
+                    status = (
+                        f"<div style='text-align:center;color:#2d6a4f;font-size:13px;'>"
+                        f"{_ico_zap()} Chanzo: opiq.co.ke — {config['subject']} {config['form']}</div>"
+                    )
                     return "", history, status
 
                 inp.submit(ask, [inp, chatbot], [inp, chatbot, cbc_status])
@@ -470,35 +539,35 @@ if __name__ == "__main__":
     manager = CBCManager(gemini_client=gemini_client)
 
     print("\n" + "="*65)
-    print("📚 AVAILABLE SUBJECTS:")
+    print("AVAILABLE SUBJECTS:")
     for s in manager.available_subjects:
         print(f"  {s}")
 
     print("\n" + "="*65)
-    print("🌐 FETCHING KILIMO F1 FROM OPIQ...")
+    print("FETCHING KILIMO F1 FROM OPIQ...")
     print("="*65)
     chapter = manager.get("kilimo_f1")
     english = chapter.get_english_chapter()
-    print(f"\n📄 English (first 500 chars):\n{english[:500]}")
+    print(f"\nEnglish (first 500 chars):\n{english[:500]}")
 
     print("\n" + "="*65)
-    print("🌍 SWAHILI TRANSLATION")
+    print("SWAHILI TRANSLATION")
     print("="*65)
     swahili = chapter.get_swahili_chapter(verbose=True)
-    print(f"\n📄 Kiswahili (first 500 chars):\n{swahili[:500]}")
+    print(f"\nKiswahili (first 500 chars):\n{swahili[:500]}")
 
     print("\n" + "="*65)
-    print("🎓 RAG Q&A TEST")
+    print("RAG Q&A TEST")
     print("="*65)
     for q in ["Kilimo ni nini?", "Taja matawi makuu ya kilimo",
               "Genetics katika kilimo inamaanisha nini?"]:
-        print(f"\n📝 Swali: {q}")
+        print(f"\nSwali: {q}")
         result = chapter.answer(q, verbose=True)
-        print(f"✅ Jibu:\n{result['response']}")
+        print(f"Jibu:\n{result['response']}")
 
     print("\n" + "="*65)
-    print("🔍 AUTO-MATCH TEST")
+    print("AUTO-MATCH TEST")
     print("="*65)
     for q in ["Kilimo ni nini?", "Hesabu ni somo gani?", "Biolojia inahusiana na nini?"]:
         matched = manager.answer_query(q)
-        print(f"Query: '{q}' → Matched: {matched.get('subject_key', 'None')}")
+        print(f"Query: '{q}' -> Matched: {matched.get('subject_key', 'None')}")
