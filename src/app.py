@@ -49,13 +49,13 @@ if torch.cuda.is_available():
     torch.cuda.empty_cache()
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-print(f"🚀 Using device: {device}")
+print(f"Using device: {device}")
 
 if device == "cuda":
     free_mem = torch.cuda.mem_get_info()[0] / 1024**2
-    print(f"📊 Starting with {free_mem:.2f} MiB free VRAM")
+    print(f"Starting with {free_mem:.2f} MiB free VRAM")
 
-print("\n📥 Loading fine-tuned Swahili-Gemma model...")
+print("\n Loading fine-tuned Swahili-Gemma model...")
 start = time.time()
 MODEL_PATH = "/kaggle/input/notebooks/briangreenheart/finetuninggood/swahili-gemma-finetuned/merged_model"
 
@@ -69,14 +69,14 @@ model = AutoModelForCausalLM.from_pretrained(
 tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH, local_files_only=True)
 tokenizer.pad_token = tokenizer.eos_token
 tokenizer.padding_side = "left"
-print(f"✅ Model loaded in {time.time() - start:.2f} seconds")
+print(f"Model loaded in {time.time() - start:.2f} seconds")
 
-print("\n📥 Loading embedding model...")
+print("\n Loading embedding model...")
 gc.collect()
 if device == "cuda":
     torch.cuda.empty_cache()
 embedding_model = SentenceTransformer('intfloat/multilingual-e5-large-instruct')
-print("✅ Embedding model loaded")
+print(" Embedding model loaded")
 
 # =============================
 # GENERATION SETTINGS (improved defaults)
@@ -84,21 +84,21 @@ print("✅ Embedding model loaded")
 generation_config = {
     "max_new_tokens": 220,
     "do_sample": True,
-    "temperature": 0.30, # default / no-context path
+    "temperature": 0.30,
     "top_p": 0.95,
     "top_k": 64,
-    "repetition_penalty": 1.18, # lowered from 1.3 — critical fix
+    "repetition_penalty": 1.18,
     "pad_token_id": tokenizer.eos_token_id,
     "eos_token_id": tokenizer.eos_token_id,
     "use_cache": True,
 }
-print("\n⚙️ Generation Settings:")
+print("\n Generation Settings:")
 for k, v in generation_config.items():
     if k not in ['pad_token_id', 'eos_token_id', 'use_cache']:
         print(f" • {k}: {v}")
 
 # =============================
-# KISWAHILI LITERATURE RAG (unchanged)
+# KISWAHILI LITERATURE RAG
 # =============================
 class SwahiliLiteratureRAG:
     def __init__(self, knowledge_base_path: str = None, model_path: str = None):
@@ -231,13 +231,12 @@ CREATIVE_PREFIXES = [
     "andika", "tunga", "badilisha", "fasiri", "tafsiri",
     "sahihisha", "unda", "ongeza", "punguza", "fupisha", "panua",
     "sema kwa", "translate", "eleza maana", "fafanua"
-    # deliberately removed: "unadhani", "unafikiri" → now treated more carefully
 ]
 def is_creative_or_grammar_query(query: str) -> bool:
     q = query.lower().strip()
     for prefix in CREATIVE_PREFIXES:
         if prefix in q:
-            print(f" 🎨 Creative/grammar detected ('{prefix}') — skipping RAG")
+            print(f"Creative/grammar detected ('{prefix}') — skipping RAG")
             return True
     return False
 
@@ -266,7 +265,7 @@ class WikipediaKnowledgeBase:
         query_lower = query.lower()
         for key, value in self.entity_mappings.items():
             if key in query_lower:
-                print(f" 🔍 Mapped → '{value}'")
+                print(f"Mapped -> '{value}'")
                 return value
         return query
 
@@ -275,7 +274,7 @@ class WikipediaKnowledgeBase:
             return self.page_cache[query]
         articles = []
         term = self.get_best_search_term(query)
-        print(f" 🔎 Searching: '{term}'")
+        print(f"Searching: '{term}'")
         try:
             wikipedia.set_lang("en")
             for title in wikipedia.search(term, results=max_results):
@@ -290,7 +289,7 @@ class WikipediaKnowledgeBase:
                     articles.append({'title': page.title, 'content': page.summary, 'url': page.fullurl, 'language': 'sw'})
                     break
         except Exception as e:
-            print(f" ⚠️ Wikipedia error: {e}")
+            print(f"Wikipedia error: {e}")
         self.page_cache[query] = articles
         return articles
 
@@ -322,7 +321,7 @@ class WikipediaKnowledgeBase:
         return [self.documents[i] for i in indices[0] if i < len(self.documents)]
 
 # =============================
-# TAVILY + DDG (simplified)
+# TAVILY + DDG
 # =============================
 class TavilyRetriever:
     def __init__(self):
@@ -330,7 +329,7 @@ class TavilyRetriever:
         self.endpoint = "https://api.tavily.com/search"
     def search(self, query: str, max_results: int = 3) -> Optional[Dict]:
         if not self.api_key:
-            print(" ⚠️ No TAVILY_API_KEY")
+            print(" No TAVILY_API_KEY")
             return None
         try:
             r = requests.post(self.endpoint, json={
@@ -340,8 +339,6 @@ class TavilyRetriever:
                 "max_results": max_results,
                 "include_answer": True,
                 "exclude_domains": ["facebook.com", "instagram.com", "twitter.com", "tiktok.com"],
-            
-            
             }, timeout=12)
             data = r.json()
             if data.get("answer"):
@@ -355,6 +352,7 @@ class TavilyRetriever:
         except Exception as e:
             print(f" Tavily error: {e}")
         return None
+
 class DuckDuckGoRetriever:
     def search(self, query: str) -> Optional[Dict]:
         try:
@@ -371,17 +369,15 @@ class DuckDuckGoRetriever:
         return None
 
 # =============================
-# POST-PROCESSING (improved)
+# POST-PROCESSING
 # =============================
 def extract_model_response(full_response: str) -> str:
     if "\nmodel\n" in full_response:
         resp = full_response.split("\nmodel\n")[-1].strip()
     else:
         resp = full_response.strip()
-    # Remove junk
     resp = re.sub(r'\[[\w\s\/\-]+\]', '', resp)
     resp = re.sub(r'^(Answer:|Jibu:|Jibu sahihi:)\s*', '', resp, flags=re.I)
-    # Better sentence splitting
     sentences = re.split(r'(?<=[.!?])\s+', resp)
     clean = []
     seen = set()
@@ -394,7 +390,6 @@ def extract_model_response(full_response: str) -> str:
         clean.append(s)
     clean = clean[:5]
     final = ' '.join(s.strip() for s in clean if s.strip()).strip()
-    # Catch obvious garbage
     if re.search(r'(\d+\.){10,}', final) or len(final.split()) > 120 and '.' in final * 10:
         return "Samahani, nimepata hitilafu ya uundaji. Tafadhali jaribu tena."
     return final if final else "Samahani, sikupata jibu sahihi. Unaweza kuuliza tena?"
@@ -408,7 +403,7 @@ def should_use_rag(query: str, confidence_threshold: float = 0.68) -> Tuple[bool
     is_factual = any(kw in q_lower for kw in factual_kw)
     is_short = len(query.split()) < 3
     if is_short and not is_factual:
-        print(" 💬 Short casual query — skipping RAG")
+        print(" Short casual query — skipping RAG")
         return False, "", 1.0
     formatted = f"<start_of_turn>user\n{query}<end_of_turn>\n<start_of_turn>model\n"
     inputs = tokenizer(formatted, return_tensors="pt", padding=True, truncation=True, max_length=2048).to(model.device)
@@ -426,16 +421,15 @@ def should_use_rag(query: str, confidence_threshold: float = 0.68) -> Tuple[bool
     too_short = len(answer.split()) < 4
     top_conf = 0.95
     use_rag = is_factual or has_placeholder or too_short
-    print(f" 📊 Probe confidence rough: {top_conf:.2f} | placeholder: {has_placeholder} | short: {too_short}")
+    print(f"Probe confidence rough: {top_conf:.2f} | placeholder: {has_placeholder} | short: {too_short}")
     return use_rag, answer, top_conf
 
 # =============================
 # MAIN FUNCTION
 # =============================
-
 def hybrid_generate(prompt: str, context: str, query: str) -> str:
     if context.strip():
-        print(" 🌐 Context available — using Gemini directly...")
+        print(" Context available — using Gemini directly...")
         try:
             gemini_prompt = (
                 "Wewe ni msaidizi wa Kiswahili. Tumia TAARIFA zilizotolewa PEKEE. "
@@ -445,13 +439,12 @@ def hybrid_generate(prompt: str, context: str, query: str) -> str:
             response = gemini_client.generate_content(gemini_prompt)
             result = response.text
             if result and result.strip():
-                print(" ✅ Gemini successful")
+                print(" Gemini successful")
                 return result.strip()
         except Exception as e:
-            print(f" ⚠️ Gemini failed: {e}")
+            print(f"Gemini failed: {e}")
 
-    # Fallback to local model if Groq fails or no context
-    print(" 🔄 Falling back to local model...")
+    print(" Falling back to local model...")
     formatted = f"<start_of_turn>user\n{prompt}<end_of_turn>\n<start_of_turn>model\n"
     inputs = tokenizer(formatted, return_tensors="pt", truncation=True, max_length=2048).to(model.device)
     cfg = {**generation_config, "temperature": 0.15}
@@ -459,6 +452,7 @@ def hybrid_generate(prompt: str, context: str, query: str) -> str:
         out = model.generate(**inputs, **cfg)
     local_response = extract_model_response(tokenizer.decode(out[0], skip_special_tokens=True))
     return local_response or "Samahani, sikupata jibu. Tafadhali jaribu tena."
+
 def generate_with_rag(
     query: str,
     kb: WikipediaKnowledgeBase,
@@ -467,9 +461,8 @@ def generate_with_rag(
     show_context: bool = False,
     confidence_threshold: float = 0.68
 ) -> Tuple[str, List[Dict]]:
-    print(f"\n🔍 Query: {query}")
+    print(f"\n Query: {query}")
 
-    # Identity response
     IDENTITY_TRIGGERS = ["wewe ni nani", "kazi yako ni nini", "unaweza kufanya nini", "wewe ni robot", "wewe ni binadamu", "sauti ni nini", "unaitwa nani", "jina lako", "una jina", "mambo, unaitwa", "unaitwa", "uliundwa na nani", "nani alikuunda", "wewe ni nini", "unatoka wapi", "ulitoka wapi", "ulitokea wapi", "ni nani wewe"]
     query_clean = re.sub(r'[?!.,;:]', '', query.lower().strip())
     if any(t in query_clean for t in IDENTITY_TRIGGERS):
@@ -485,23 +478,21 @@ def generate_with_rag(
 
     use_rag, initial, conf = should_use_rag(query, confidence_threshold)
     if not use_rag:
-        print(f" ✅ Confident direct — still checking Tavily...")
+        print(f"Confident direct — still checking Tavily...")
         pass
 
-    print(f" 🔍 Retrieving (conf was {conf:.2f})...")
+        print(f"Retrieving (conf was {conf:.2f})...")
     context = ""
     sources = []
 
-    # Try Tavily first
-    print(" 🌐 Trying Tavily...")
+    print(" Trying Tavily...")
     res = tavily.search(query) if tavily else None
     if res:
         context = res['content']
         sources = [{'title': res['source'], 'url': res.get('url', ''), 'language': 'en'}]
 
-    # Fall back to Wikipedia if Tavily returns nothing
     if not context:
-        print(" 📖 Tavily empty — trying Wikipedia...")
+        print(" Tavily empty — trying Wikipedia...")
         articles = kb.search_and_fetch(query)
         if articles:
             kb.create_vector_store(articles)
@@ -511,9 +502,8 @@ def generate_with_rag(
                 context += f"[Wikipedia{lang_note} – {doc['title']}]\n{doc['content']}\n\n"
                 sources.append({'title': doc['title'], 'url': doc['url'], 'language': doc['language']})
 
-    # Fall back to DDG if both Tavily and Wikipedia return nothing
     if not context:
-        print(" 🦆 Trying DuckDuckGo...")
+        print(" Trying DuckDuckGo...")
         res = ddg.search(query) if ddg else None
         if res:
             context = res['content']
@@ -523,7 +513,7 @@ def generate_with_rag(
         return "Samahani, sikupata taarifa za kutosha kujibu swali hili.", []
 
     if show_context:
-        print(f"\n📚 Context (truncated):\n{context[:600]}...\n")
+        print(f"\n Context (truncated):\n{context[:600]}...\n")
 
     prompt = f"""Wewe ni msaidizi wa Kiswahili sahihi na wa kuaminika.
 KANUNI (LAZIMA UFuate):
@@ -536,7 +526,7 @@ KANUNI (LAZIMA UFuate):
 7. Ikiwa jibu halipo kwenye TAARIFA, sema: "Samahani, maelezo yaliyotolewa hayatoshi."
 8. Jibu kwa Kiswahili sanifu pekee — USITUMIE Kiingereza.
 9. FOR NUMBERS AND STATISTICS: Use the EXACT numbers from the PROVIDED INFORMATION without changing even a single digit.
-10. Answer with 50–120 words then ask a short follow-up question.
+10. Answer with 50-120 words then ask a short follow-up question.
 11. Do NOT repeat sentences or lists without reason. Do NOT combine unrelated ideas.
 TAARIFA:
 {context[:2000]}
@@ -564,50 +554,37 @@ class KikuyuTranscriber:
         self.output_dir.mkdir(exist_ok=True)
         self.audio_dir = self.output_dir / "audio"
         self.audio_dir.mkdir(exist_ok=True)
-
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-
-        variants = [
-            f"omniASR_LLM_{model_size}",
-            f"omniASR_LLM_{model_size}_v2",
-        ]
+        variants = [f"omniASR_LLM_{model_size}", f"omniASR_LLM_{model_size}_v2"]
         if model_size == "300M" and not prefer_ctc:
             variants.insert(0, "omniASR_CTC_300M_v2")
-
         self.pipeline = None
         self.model_card = None
-
         print(f"\nTrying to load model ({model_size})...")
         for name in variants:
             try:
-                print(f"  → {name}")
+                print(f"  -> {name}")
                 self.pipeline = ASRInferencePipeline(model_card=name)
                 self.model_card = name
-                print(f"✅ Loaded: {name}")
+                print(f"Loaded: {name}")
                 break
             except Exception as e:
-                print(f"  ✗ Failed: {str(e)[:80]}...")
-
+                print(f"  Failed: {str(e)[:80]}...")
         if self.pipeline is None:
-            raise RuntimeError("No model could be loaded. Try smaller size or check internet/storage.")
-
+            raise RuntimeError("No model could be loaded.")
         self.is_llm = "LLM" in self.model_card
         print(f"Model type: {'LLM (supports lang)' if self.is_llm else 'CTC (zero-shot, no lang)'}")
-
-        # Load DeepFilterNet once
         print("Loading DeepFilterNet...")
         from df.enhance import enhance, init_df
         self.df_model, self.df_state, _ = init_df()
         self.df_enhance = enhance
-        print(f"✅ DeepFilterNet loaded on {next(self.df_model.parameters()).device}")
-
-        # Load Silero VAD once
+        print(f"DeepFilterNet loaded on {next(self.df_model.parameters()).device}")
         print("Loading Silero VAD...")
         from silero_vad import load_silero_vad, read_audio, get_speech_timestamps
         self.vad_model = load_silero_vad()
         self.read_audio = read_audio
         self.get_speech_timestamps = get_speech_timestamps
-        print("✅ Silero VAD loaded")
+        print("Silero VAD loaded")
 
     def download_youtube_audio(self, url):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -618,11 +595,8 @@ class KikuyuTranscriber:
             'outtmpl': str(output_path.with_suffix('')),
             'quiet': False,
             'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
-            'http_headers': {
-                'User-Agent': 'Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.91 Mobile Safari/537.36',
-            },
-            'retries': 3,
-            'fragment_retries': 3,
+            'http_headers': {'User-Agent': 'Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36'},
+            'retries': 3, 'fragment_retries': 3,
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
@@ -639,7 +613,6 @@ class KikuyuTranscriber:
         enhanced = self.df_enhance(self.df_model, self.df_state, audio)
         enhanced_path = str(audio_path).replace(".wav", "_enhanced.wav")
         torchaudio.save(enhanced_path, enhanced, sr)
-        print(f"✅ Audio enhanced with DeepFilterNet: {enhanced_path}")
         return Path(enhanced_path)
 
     def remove_repetitions(self, text: str) -> str:
@@ -659,26 +632,16 @@ class KikuyuTranscriber:
         PREROLL_MS = 200
         sample_rate = 16000
         preroll_samples = int(PREROLL_MS * sample_rate / 1000)
-
         wav = self.read_audio(str(audio_path))
-        speech_timestamps = self.get_speech_timestamps(
-            wav, self.vad_model,
-            return_seconds=False,
-            threshold=0.4
-        )
-
+        speech_timestamps = self.get_speech_timestamps(wav, self.vad_model, return_seconds=False, threshold=0.4)
         speech_timestamps = sorted(speech_timestamps, key=lambda x: x['start'])
-
         if not speech_timestamps:
-            print("⚠️ No speech detected — falling back to fixed chunking")
             return self._fixed_chunks(audio_path, max_sec)
-
         audio = AudioSegment.from_wav(str(audio_path))
         chunks = []
         temp_files = []
         current_start = speech_timestamps[0]['start']
         current_end = speech_timestamps[0]['end']
-
         for ts in speech_timestamps[1:]:
             segment_duration = (ts['end'] - current_start) / sample_rate
             if segment_duration <= max_sec:
@@ -686,43 +649,50 @@ class KikuyuTranscriber:
             else:
                 start_ms = max(0, int((current_start - preroll_samples) / sample_rate * 1000))
                 end_ms = int(current_end / sample_rate * 1000)
-                chunk = audio[start_ms:end_ms]
-                chunk = chunk.set_frame_rate(16000).set_channels(1)
+                chunk = audio[start_ms:end_ms].set_frame_rate(16000).set_channels(1)
                 with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
                     chunk.export(tmp.name, format="wav")
                     chunks.append(tmp.name)
                     temp_files.append(tmp.name)
                 current_start = ts['start']
                 current_end = ts['end']
-
-        # Export last chunk
         start_ms = max(0, int((current_start - preroll_samples) / sample_rate * 1000))
         end_ms = int(current_end / sample_rate * 1000)
-        chunk = audio[start_ms:end_ms]
-        chunk = chunk.set_frame_rate(16000).set_channels(1)
+        chunk = audio[start_ms:end_ms].set_frame_rate(16000).set_channels(1)
         with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
             chunk.export(tmp.name, format="wav")
             chunks.append(tmp.name)
             temp_files.append(tmp.name)
-
-        print(f"✅ VAD + preroll: {len(speech_timestamps)} segments → {len(chunks)} chunks")
         return chunks, temp_files
 
     def _fixed_chunks(self, audio_path, max_sec=25):
-        audio = AudioSegment.from_wav(str(audio_path))
-        audio = audio.set_frame_rate(16000).set_channels(1)
-        duration_ms = len(audio)
-        chunk_ms = max_sec * 1000
+        audio = AudioSegment.from_wav(str(audio_path)).set_frame_rate(16000).set_channels(1)
         chunks = []
         temp_files = []
-        for i in range(0, duration_ms, chunk_ms):
-            chunk = audio[i:i + chunk_ms]
+        for i in range(0, len(audio), max_sec * 1000):
+            chunk = audio[i:i + max_sec * 1000]
             with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
                 chunk.export(tmp.name, format="wav")
                 temp_files.append(tmp.name)
                 chunks.append(tmp.name)
-        print(f"Split into {len(chunks)} fixed chunks")
         return chunks, temp_files
+
+    def _transcribe_chunks(self, chunks, lang):
+        try:
+            kwargs = {"lang": [lang]} if self.is_llm else {}
+            raw = self.pipeline.transcribe(chunks, batch_size=4, **kwargs)
+            return [t.strip() if t else "[Empty]" for t in raw]
+        except Exception as e:
+            print(f"Batch failed: {e} — single chunk fallback")
+            results = []
+            for chunk in tqdm(chunks, desc="Transcribing"):
+                try:
+                    kwargs = {"lang": [lang]} if self.is_llm else {}
+                    trans = self.pipeline.transcribe([chunk], batch_size=1, **kwargs)
+                    results.append(trans[0].strip() if trans else "[Empty]")
+                except Exception as ce:
+                    results.append(f"[Error: {str(ce)[:60]}]")
+            return results
 
     def process_video(self, url, lang="kik_Latn", enhance=True, use_vad=True):
         audio_file, title, dur = self.download_youtube_audio(url)
@@ -730,124 +700,60 @@ class KikuyuTranscriber:
             return None
         if enhance:
             audio_file = self.enhance_audio(audio_file)
-            print("✅ Enhancement: ON")
-        else:
-            print("⚠️ Enhancement: OFF")
-        if use_vad:
-            chunks, temps = self.split_audio_into_chunks(audio_file)
-            print("✅ VAD: ON")
-        else:
-            chunks, temps = self._fixed_chunks(audio_file)
-            print("⚠️ VAD: OFF (fixed chunking)")
-        print(f"Transcribing {len(chunks)} chunks (batch_size=4)...")
-        try:
-            kwargs = {"lang": [lang]} if self.is_llm else {}
-            raw = self.pipeline.transcribe(chunks, batch_size=4, **kwargs)
-            transcriptions = [t.strip() if t else "[Empty]" for t in raw]
-        except Exception as e:
-            print(f"⚠️ Batch transcription failed: {e} — falling back to single chunk mode")
-            transcriptions = []
-            for chunk in tqdm(chunks, desc="Transcribing"):
-                try:
-                    kwargs = {"lang": [lang]} if self.is_llm else {}
-                    trans = self.pipeline.transcribe([chunk], batch_size=1, **kwargs)
-                    transcriptions.append(trans[0].strip() if trans else "[Empty]")
-                except Exception as ce:
-                    transcriptions.append(f"[Error: {str(ce)[:60]}]")
+        chunks, temps = self.split_audio_into_chunks(audio_file) if use_vad else self._fixed_chunks(audio_file)
+        transcriptions = self._transcribe_chunks(chunks, lang)
         for t in temps:
             try: os.unlink(t)
             except: pass
-        full_text = " ".join(transcriptions)
-        full_text = self.remove_repetitions(full_text)
-        result = {
-            "title": title,
-            "url": url,
-            "duration": dur,
-            "transcription": full_text,
-            "model": self.model_card,
-            "lang": lang if self.is_llm else "zero-shot (CTC)",
-            "enhancement": enhance,
-            "vad": use_vad
-        }
+        full_text = self.remove_repetitions(" ".join(transcriptions))
+        result = {"title": title, "url": url, "duration": dur, "transcription": full_text,
+                  "model": self.model_card, "lang": lang if self.is_llm else "zero-shot (CTC)",
+                  "enhancement": enhance, "vad": use_vad}
         safe_title = "".join(c if c.isalnum() else "_" for c in title)[:40]
         out_file = self.output_dir / f"{safe_title}_{datetime.now():%Y%m%d_%H%M}.json"
         with open(out_file, 'w', encoding='utf-8') as f:
             json.dump(result, f, ensure_ascii=False, indent=2)
-        print(f"Saved: {out_file}")
+        import threading
+        def delete_after_delay(filepath, delay=300):
+            time.sleep(delay)
+            try:
+                os.remove(filepath)
+                print(f"Auto-deleted: {filepath}")
+            except:
+                pass
+        threading.Thread(target=delete_after_delay, args=(str(out_file),), daemon=True).start()
         return result, full_text, str(out_file)
 
     def process_file(self, audio_path, lang="kik_Latn", enhance=True, use_vad=True):
         audio_file = Path(audio_path)
         if not audio_file.exists():
             return None
-
         if enhance:
             audio_file = self.enhance_audio(audio_file)
-            print("✅ Enhancement: ON")
-        else:
-            print("⚠️ Enhancement: OFF")
-
-        if use_vad:
-            chunks, temps = self.split_audio_into_chunks(audio_file)
-            print("✅ VAD: ON")
-        else:
-            chunks, temps = self._fixed_chunks(audio_file)
-            print("⚠️ VAD: OFF (fixed chunking)")
-
-        print(f"Transcribing {len(chunks)} chunks (batch_size=4)...")
-        try:
-            kwargs = {"lang": [lang]} if self.is_llm else {}
-            raw = self.pipeline.transcribe(chunks, batch_size=4, **kwargs)
-            transcriptions = [t.strip() if t else "[Empty]" for t in raw]
-        except Exception as e:
-            print(f"⚠️ Batch failed: {e} — falling back to single chunk mode")
-            transcriptions = []
-            for chunk in tqdm(chunks, desc="Transcribing"):
-                try:
-                    kwargs = {"lang": [lang]} if self.is_llm else {}
-                    trans = self.pipeline.transcribe([chunk], batch_size=1, **kwargs)
-                    transcriptions.append(trans[0].strip() if trans else "[Empty]")
-                except Exception as ce:
-                    transcriptions.append(f"[Error: {str(ce)[:60]}]")
-
+        chunks, temps = self.split_audio_into_chunks(audio_file) if use_vad else self._fixed_chunks(audio_file)
+        transcriptions = self._transcribe_chunks(chunks, lang)
         for t in temps:
             try: os.unlink(t)
             except: pass
-
-        full_text = " ".join(transcriptions)
-        full_text = self.remove_repetitions(full_text)
-
-        result = {
-            "title": audio_file.stem,
-            "duration": "unknown",
-            "transcription": full_text,
-            "model": self.model_card,
-            "lang": lang if self.is_llm else "zero-shot (CTC)",
-            "enhancement": enhance,
-            "vad": use_vad
-        }
-
+        full_text = self.remove_repetitions(" ".join(transcriptions))
+        result = {"title": audio_file.stem, "duration": "unknown", "transcription": full_text,
+                  "model": self.model_card, "lang": lang if self.is_llm else "zero-shot (CTC)",
+                  "enhancement": enhance, "vad": use_vad}
         out_file = self.output_dir / f"notes_{datetime.now():%Y%m%d_%H%M}.json"
         with open(out_file, 'w', encoding='utf-8') as f:
             json.dump(result, f, ensure_ascii=False, indent=2)
-
         return result, full_text, str(out_file)
 
 
+# =============================
 # INITIALIZE ALL SYSTEMS
 # =============================
 def initialize_systems():
-    knowledge_base_paths = [
-        "/kaggle/input/datasets/briangreenheart/combined/combined (1).json"
-    ]
+    knowledge_base_paths = ["/kaggle/input/datasets/briangreenheart/combined/combined (1).json"]
     kb_path = next((p for p in knowledge_base_paths if os.path.exists(p)), None)
     if not kb_path:
         print("Warning: Knowledge base not found. Using default data.")
-    lit_model_paths = [
-        "/kaggle/input/gemma/swahili-gemma-finetuned",
-        "/kaggle/input/swahili-gemma-finetuned",
-        "swahili-gemma-finetuned"
-    ]
+    lit_model_paths = ["/kaggle/input/gemma/swahili-gemma-finetuned", "/kaggle/input/swahili-gemma-finetuned", "swahili-gemma-finetuned"]
     lit_model_path = next((p for p in lit_model_paths if os.path.exists(p)), None)
     if not lit_model_path:
         print("Warning: Literature model not found. Using knowledge base only.")
@@ -865,7 +771,6 @@ print("All systems initialized!")
 # LIBRARY LOADER
 # =============================
 LIBRARY_PATH = "/kaggle/input/datasets/briangreenheart/literary-works/LITERARY WORKS"
-
 LIBRARY_METADATA = [
     {"id": "kasiri", "title": "Kasiri ya Mwinyi Fuad", "author": "Adam Shafi Adam", "category": "Fasihi ya Kiswahili", "filename": "Kasiri ya Mwinyi Fuad.txt"},
     {"id": "kusadikika", "title": "Kusadikika", "author": "Shaaban Robert", "category": "Fasihi ya Kiswahili", "filename": "Kusadikika.txt"},
@@ -890,100 +795,105 @@ def get_page(text: str, page: int, words_per_page: int = 500) -> Tuple[str, int,
     total_pages = max(1, (len(words) + words_per_page - 1) // words_per_page)
     page = max(0, min(page, total_pages - 1))
     start = page * words_per_page
-    end = start + words_per_page
-    return " ".join(words[start:end]), page, total_pages
+    return " ".join(words[start:start + words_per_page]), page, total_pages
+
+# =============================
+# ICON HELPER
+# =============================
+ICON_DIR = "/kaggle/working/icons"
+
+def icon_b64(name: str, size: int = 16, extra_style: str = "") -> str:
+    path = os.path.join(ICON_DIR, f"{name}.svg")
+    with open(path, "rb") as f:
+        b64 = base64.b64encode(f.read()).decode()
+    style = f"vertical-align:middle;margin-right:4px;{extra_style}"
+    return f'<img src="data:image/svg+xml;base64,{b64}" width="{size}" height="{size}" style="{style}" alt="">'
+
+ICO = {
+    "book":     icon_b64("book-open", 16),
+    "globe":    icon_b64("globe", 16),
+    "mic":      icon_b64("mic", 16),
+    "library":  icon_b64("library", 16),
+    "chat":     icon_b64("message-circle", 16),
+    "sprout":   icon_b64("sprout", 16),
+    "micro":    icon_b64("microscope", 16),
+    "flask":    icon_b64("flask-conical", 16),
+    "send":     icon_b64("send", 16),
+    "trash":    icon_b64("trash-2", 16),
+    "file":     icon_b64("file-text", 16),
+    "download": icon_b64("download", 16),
+    "zap":      icon_b64("zap", 16),
+    "prev":     icon_b64("send", 16, "transform:scaleX(-1);"),
+}
 
 def create_app():
     custom_css = """
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap');
-
     .gradio-container { font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
     h1, h2, h3, .header-text h1 { font-family: 'Playfair Display', serif; font-weight: 700; line-height: 1.2; }
-
-    .header {
-        background: linear-gradient(135deg, #B8651B 0%, #C77A2E 100%);
-        padding: 2.5rem; border-radius: 16px; margin-bottom: 1.5rem;
-        color: white; text-align: center; box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-    }
+    .header { background: linear-gradient(135deg, #B8651B 0%, #C77A2E 100%); padding: 2.5rem; border-radius: 16px; margin-bottom: 1.5rem; color: white; text-align: center; box-shadow: 0 8px 32px rgba(0,0,0,0.1); }
     .header .block { background: none !important; border: none !important; box-shadow: none !important; padding: 0 !important; }
     .logo-container { display: flex; align-items: center; justify-content: center; gap: 2rem; margin-bottom: 0.5rem; }
     .header-text { text-align: left; }
     .header-text h1 { margin: 0; font-size: 3rem; font-weight: 700; color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,0.3); }
-
-    .main-container {
-        display: flex !important; flex-direction: row !important; justify-content: space-between !important;
-        align-items: flex-start !important; flex-wrap: nowrap !important; gap: 1.5rem !important; width: 100%;
-    }
-    .sidebar {
-        flex: 0 0 22%; max-width: 260px; min-width: 200px; background: white;
-        border-radius: 16px; padding: 1.2rem; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 1px solid #e9ecef;
-    }
-    .chat-main {
-        flex: 1 1 78%; min-width: 0; background: white; border-radius: 16px;
-        padding: 1.5rem; box-shadow: 0 8px 32px rgba(0,0,0,0.1); border: 1px solid #e9ecef;
-    }
-    .sidebar-title {
-        font-family: 'Playfair Display', serif; font-weight: 600; font-size: 1.2rem;
-        margin-bottom: 1rem; color: #2c3e50; text-align: center;
-    }
+    .main-container { display: flex !important; flex-direction: row !important; justify-content: space-between !important; align-items: flex-start !important; flex-wrap: nowrap !important; gap: 1.5rem !important; width: 100%; }
+    .sidebar { flex: 0 0 22%; max-width: 260px; min-width: 200px; background: white; border-radius: 16px; padding: 1.2rem; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 1px solid #e9ecef; }
+    .chat-main { flex: 1 1 78%; min-width: 0; background: white; border-radius: 16px; padding: 1.5rem; box-shadow: 0 8px 32px rgba(0,0,0,0.1); border: 1px solid #e9ecef; }
+    .sidebar-title { font-family: 'Playfair Display', serif; font-weight: 600; font-size: 1.2rem; margin-bottom: 1rem; color: #2c3e50; text-align: center; }
     .sidebar-buttons { display: flex; flex-direction: column; gap: 0.8rem; }
-    .sidebar-btn {
-        width: 100% !important; text-align: left !important; justify-content: flex-start !important;
-        padding: 12px 16px !important; border-radius: 12px !important; font-size: 14px !important;
-        transition: all 0.3s ease !important;
-    }
-    .chat-container {
-        background: white; border-radius: 20px; padding: 2rem;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.1); height: fit-content; border: 1px solid #e9ecef;
-    }
+    .sidebar-btn { width: 100% !important; text-align: left !important; justify-content: flex-start !important; padding: 12px 16px !important; border-radius: 12px !important; font-size: 14px !important; transition: all 0.3s ease !important; }
+    .chat-container { background: white; border-radius: 20px; padding: 2rem; box-shadow: 0 8px 32px rgba(0,0,0,0.1); height: fit-content; border: 1px solid #e9ecef; }
     .kiswahili-active { border-top: 6px solid #B8651B; }
     .general-active { border-top: 6px solid #1F5D4F; }
     .transcriber-active { border-top: 6px solid #6B35A8; }
     .library-active { border-top: 6px solid #C9A84C; }
     .chatbot-container { border: 1px solid #e9ecef; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
-
-    .toggle-btn {
-        margin: 0 0.25rem; border-radius: 12px !important; padding: 10px 16px !important;
-        font-size: 14px !important; font-weight: 600 !important;
-        transition: all 0.3s ease !important; border: 2px solid transparent !important;
-    }
+    .chatbot-container ::-webkit-scrollbar { width: 4px; }
+    .chatbot-container ::-webkit-scrollbar-track { background: transparent; }
+    .chatbot-container ::-webkit-scrollbar-thumb { background: #B8651B; border-radius: 999px; }
+    .toggle-btn { margin: 0 0.25rem; border-radius: 12px !important; padding: 10px 16px !important; font-size: 14px !important; font-weight: 600 !important; transition: all 0.3s ease !important; border: 2px solid transparent !important; }
+    .toggle-btn svg { width: 16px; height: 16px; margin-right: 8px; vertical-align: middle; stroke-width: 2; }
     .kiswahili-active-mode { background: linear-gradient(135deg, #B8651B 0%, #C77A2E 100%) !important; color: white !important; border-color: #9a5216 !important; }
     .general-active-mode { background: linear-gradient(135deg, #1F5D4F 0%, #2A7A68 100%) !important; color: white !important; border-color: #16453a !important; }
     .transcriber-active-mode { background: linear-gradient(135deg, #6B35A8 0%, #8B55C8 100%) !important; color: white !important; border-color: #4a2278 !important; }
     .library-active-mode { background: linear-gradient(135deg, #C9A84C 0%, #E0B96A 100%) !important; color: white !important; border-color: #a8873a !important; }
-
-    .brown-primary-btn, .general-send-btn, .transcriber-btn {
-        border-radius: 12px !important; padding: 12px 30px !important;
-        font-size: 16px !important; font-weight: 600 !important;
-        transition: all 0.3s ease !important; border: 2px solid transparent !important;
-    }
+    .brown-primary-btn, .general-send-btn, .transcriber-btn { border-radius: 12px !important; padding: 12px 30px !important; font-size: 16px !important; font-weight: 600 !important; transition: all 0.3s ease !important; border: 2px solid transparent !important; }
     .brown-primary-btn { background: linear-gradient(135deg, #B8651B 0%, #C77A2E 100%) !important; color: white !important; border-color: #9a5216 !important; }
     .general-send-btn { background: linear-gradient(135deg, #1F5D4F 0%, #2A7A68 100%) !important; color: white !important; border-color: #16453a !important; }
     .transcriber-btn { background: linear-gradient(135deg, #6B35A8 0%, #8B55C8 100%) !important; color: white !important; border-color: #4a2278 !important; }
     .library-btn { background: linear-gradient(135deg, #C9A84C 0%, #E0B96A 100%) !important; color: white !important; border-radius: 12px !important; padding: 12px 30px !important; font-size: 16px !important; font-weight: 600 !important; border: 2px solid #a8873a !important; }
     .cbc-btn { background: linear-gradient(135deg, #2d6a4f 0%, #40916c 100%) !important; color: white !important; border-radius: 12px !important; padding: 12px 30px !important; font-size: 16px !important; font-weight: 600 !important; border: 2px solid #1b4332 !important; }
-
     .textbox { border-radius: 12px !important; border: 2px solid #e1e5e9 !important; transition: all 0.3s ease !important; }
     .confidence-high { color: #27ae60; font-weight: 600; }
     .confidence-medium { color: #f39c12; font-weight: 600; }
     .confidence-low { color: #e74c3c; font-weight: 600; }
     .sources-display { font-size: 13px; color: #555; padding: 8px 12px; background: #f8f9fa; border-radius: 8px; margin-top: 8px; }
-
-    .transcriber-panel {
-        background: #faf8ff; border-radius: 16px; padding: 1.5rem;
-        border: 1px solid #e0d5f5; margin-bottom: 1rem;
-    }
-    .transcriber-info {
-        background: #f0ebff; border-radius: 10px; padding: 12px 16px;
-        font-size: 13px; color: #5a3a8a; margin-bottom: 1rem;
-        border-left: 4px solid #6B35A8;
-    }
-    .book-card { background: #fffdf5; border: 1px solid #e8d9a0; border-radius: 12px; padding: 1rem; margin-bottom: 0.8rem; cursor: pointer; transition: all 0.2s ease; }
-    .book-card:hover { background: #fff8e1; border-color: #C9A84C; }
-    .book-category-swahili { color: #B8651B; font-weight: 600; font-size: 12px; }
-    .book-category-tafsiri { color: #1F5D4F; font-weight: 600; font-size: 12px; }
+    .transcriber-panel { background: #faf8ff; border-radius: 16px; padding: 1.5rem; border: 1px solid #e0d5f5; margin-bottom: 1rem; }
+    .transcriber-info { background: #f0ebff; border-radius: 10px; padding: 12px 16px; font-size: 13px; color: #5a3a8a; margin-bottom: 1rem; border-left: 4px solid #6B35A8; }
     .library-info { background: #fffdf5; border-radius: 10px; padding: 12px 16px; font-size: 13px; color: #7a6a2a; margin-bottom: 1rem; border-left: 4px solid #C9A84C; }
-    .cbc-info { background: #f0faf4; border-radius: 10px; padding: 12px 16px; font-size: 13px; color: #1b4332; margin-bottom: 1rem; border-left: 4px solid #2d6a4f; }
+    .option-badge { display: inline-block; background: linear-gradient(135deg, #6B35A8 0%, #8B55C8 100%); color: white !important; padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; margin-bottom: 1rem; letter-spacing: 0.3px; }
+    .option-divider { display: flex; align-items: center; gap: 1rem; margin: 1.2rem 0; color: #9b7fc7; font-size: 13px; font-weight: 600; }
+    .option-divider::before, .option-divider::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, transparent, #c4a8e8, transparent); }
+    .notetaker-panel { background: #faf8ff; border-radius: 16px; padding: 1.8rem; border: 1px solid #e0d5f5; margin-bottom: 1rem; gap: 1.2rem; }
+    @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 rgba(107, 53, 168, 0.4); } 70% { box-shadow: 0 0 0 12px rgba(107, 53, 168, 0); } 100% { box-shadow: 0 0 0 0 rgba(107, 53, 168, 0); } }
+    .record-btn-pulse button { animation: pulse-ring 1.5s ease-out infinite !important; border-radius: 50% !important; }
+
+    /* ── Sidebar login / profile panel ── */
+    .login-panel { background: linear-gradient(135deg,#fff8f0,#fff); border: 1.5px solid #e8d0b8; border-radius: 14px; padding: 1.2rem; margin-bottom: 1rem; text-align: center; }
+    .login-panel input { width: 100%; padding: 9px 12px; border-radius: 9px; border: 1.5px solid #e1e5e9; font-size: 13px; margin-bottom: 0.5rem; box-sizing: border-box; font-family: 'Inter', sans-serif; transition: border-color 0.2s; }
+    .login-panel input:focus { border-color: #B8651B; outline: none; }
+    .lp-title { font-family: 'Playfair Display', serif; font-size: 1rem; font-weight: 700; color: #B8651B; margin: 0.3rem 0 0.8rem; }
+    .lp-btn { width: 100%; padding: 9px; border-radius: 9px; border: none; cursor: pointer; font-size: 13px; font-weight: 600; font-family: 'Inter', sans-serif; margin-bottom: 0.4rem; transition: opacity 0.2s; }
+    .lp-btn.primary { background: linear-gradient(135deg, #B8651B, #C77A2E); color: white; }
+    .lp-btn.secondary { background: white; color: #1F5D4F; border: 1.5px solid #1F5D4F; }
+    .lp-btn:hover { opacity: 0.85; }
+    .lp-divider { font-size: 11px; color: #bbb; margin: 0.4rem 0; }
+    .lp-hint { font-size: 11px; color: #aaa; margin-top: 0.5rem; }
+    .profile-panel { background: linear-gradient(135deg,#fff8f0,#fff); border: 1.5px solid #e8d0b8; border-radius: 14px; padding: 1rem; margin-bottom: 1rem; text-align: center; }
+    .profile-avatar { width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, #B8651B, #C77A2E); color: white; font-size: 18px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin: 0 auto 0.5rem; }
+    .profile-name { font-weight: 600; font-size: 14px; color: #2c3e50; }
+    .profile-email { font-size: 11px; color: #888; margin-bottom: 0.6rem; }
+    .profile-badge { display: inline-block; background: #e8f5e9; color: #2d6a4f; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px; margin-bottom: 0.6rem; }
     """
 
     logo_path = "/kaggle/input/datasets/briangreenheart/bestttt/Sauti logo.png"
@@ -1000,9 +910,9 @@ def create_app():
             <div class="logo-container">
                 <div style="display:flex;align-items:center;justify-content:center;gap:2rem;">
                     <img src="data:image/png;base64,{logo_base64}"
-                         style="width:90px;height:90px;object-fit:contain;border-radius:50%;
+                        style="width:90px;height:90px;object-fit:contain;border-radius:50%;
                                 background:white;padding:10px;box-shadow:0 4px 20px rgba(0,0,0,0.15);"
-                         alt="Sauti Logo">
+                        alt="Sauti Logo">
                     <div class="header-text">
                         <h1>Sauti</h1>
                         <p style="font-size:1.2rem;font-weight:400;color:#fff;margin-top:0.3rem;opacity:0.9;">
@@ -1015,31 +925,105 @@ def create_app():
 
         # ── Main layout ─────────────────────────────────────────
         with gr.Row(elem_classes="main-container"):
-
             # ── Sidebar ─────────────────────────────────────────
             with gr.Column(elem_classes="sidebar"):
+
+                # ── Login / Profile panel ────────────────────────
+                with gr.Column(visible=True) as login_panel:
+                    gr.HTML("<div style='font-family:Playfair Display,serif;font-size:1rem;font-weight:700;color:#B8651B;text-align:center;margin-bottom:0.5rem;padding:0.8rem 0 0;'>Welcome to Sauti</div>")
+                    login_email = gr.Textbox(placeholder="Email address", label="", elem_classes="textbox")
+                    login_pass  = gr.Textbox(placeholder="Password", label="", type="password", elem_classes="textbox")
+                    login_btn   = gr.Button("Sign In", variant="primary", size="lg", elem_classes="brown-primary-btn")
+                    signup_btn  = gr.Button("Create Account", variant="secondary", size="lg")
+                    gr.HTML("<p style='font-size:11px;color:#aaa;text-align:center;margin-top:0.3rem;'>Demo: demo@sauti.ai / sauti2025</p>")
+
+                with gr.Column(visible=False) as profile_panel:
+                    gr.HTML("""
+                    <div style='background:linear-gradient(135deg,#fff8f0,#fff);border:1.5px solid #e8d0b8;
+                                border-radius:14px;padding:1rem;text-align:center;'>
+                        <div style='width:48px;height:48px;border-radius:50%;
+                                    background:linear-gradient(135deg,#B8651B,#C77A2E);
+                                    color:white;font-size:20px;font-weight:700;
+                                    display:flex;align-items:center;justify-content:center;
+                                    margin:0 auto 0.5rem;'>S</div>
+                        <div style='font-weight:600;font-size:14px;color:#2c3e50;'>Sauti User</div>
+                        <div style='font-size:11px;color:#888;margin-bottom:0.5rem;'>demo@sauti.ai</div>
+                        <div style='display:inline-block;background:#e8f5e9;color:#2d6a4f;
+                                    font-size:11px;font-weight:600;padding:3px 10px;
+                                    border-radius:20px;'>Active Session</div>
+                    </div>
+                    """)
+                    logout_btn = gr.Button("Sign Out", size="sm", icon="/kaggle/working/icons/zap.svg")
+
+                gr.HTML("<div style='margin:0.5rem 0 1rem;border-top:1px solid #e1e5e9;'></div>")
+
                 with gr.Column():
                     kiswahili_toggle = gr.Button(
-                        "📚 Msaidizi wa CBC", variant="primary", size="lg",
-                        elem_classes="toggle-btn kiswahili-active-mode"
+                        "Msaidizi wa CBC", variant="primary", size="lg",
+                        icon="/kaggle/working/icons/book-open.svg",
+                        elem_classes="toggle-btn kiswahili-active-mode",
+                        elem_id="cbc_btn"
                     )
                     general_toggle = gr.Button(
-                        "🌍 Msaidizi wa Jumla", variant="secondary", size="lg",
-                        elem_classes="toggle-btn"
+                        "Msaidizi wa Jumla", variant="secondary", size="lg",
+                        icon="/kaggle/working/icons/globe.svg",
+                        elem_classes="toggle-btn",
+                        elem_id="general_btn"
                     )
                     transcriber_toggle = gr.Button(
-                        "🎙️ African Language Transcriber", variant="secondary", size="lg",
-                        elem_classes="toggle-btn"
+                        "African Language Transcriber", variant="secondary", size="lg",
+                        icon="/kaggle/working/icons/mic.svg",
+                        elem_classes="toggle-btn",
+                        elem_id="transcriber_btn"
                     )
                     library_toggle = gr.Button(
-                        "📖 Maktaba", variant="secondary", size="lg",
-                        elem_classes="toggle-btn"
+                        "Maktaba", variant="secondary", size="lg",
+                        icon="/kaggle/working/icons/library.svg",
+                        elem_classes="toggle-btn",
+                        elem_id="library_btn"
                     )
 
                 gr.HTML("<div style='margin:1rem 0;border-top:1px solid #e1e5e9;'></div>")
 
                 with gr.Column(visible=True) as kiswahili_sidebar:
-                    pass
+                    gr.HTML("""
+                    <div style="margin-top:0.5rem;background:#f8f9fa;border-radius:10px;padding:1rem;border-left:4px solid #2d6a4f;">
+                        <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.8rem;">
+                            <span style="background:#2d6a4f;color:white;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;">GDPR+</span>
+                            <span style="font-weight:600;font-size:13px;">Data Protection</span>
+                        </div>
+                        <div style="font-size:12px;color:#2c3e50;">
+                            <div style="display:flex;justify-content:space-between;margin-bottom:0.5rem;">
+                                <span>&#x1F510; Encryption</span>
+                                <span style="color:#27ae60;font-weight:600;">AES-256</span>
+                            </div>
+                            <div style="display:flex;justify-content:space-between;margin-bottom:0.5rem;">
+                                <span>&#x1F4CA; Data Retention</span>
+                                <span style="color:#27ae60;font-weight:600;">5 minutes</span>
+                            </div>
+                            <div style="display:flex;justify-content:space-between;margin-bottom:0.5rem;">
+                                <span>&#x1F464; Anonymization</span>
+                                <span style="color:#27ae60;font-weight:600;">Active</span>
+                            </div>
+                            <div style="display:flex;justify-content:space-between;margin-bottom:0.5rem;">
+                                <span>&#x1F6E1; Rate Limiting</span>
+                                <span style="color:#27ae60;font-weight:600;">5 attempts/15min</span>
+                            </div>
+                        </div>
+                        <div style="margin-top:0.8rem;padding-top:0.8rem;border-top:1px dashed #ddd;font-size:11px;color:#666;">
+                            <details>
+                                <summary style="cursor:pointer;font-weight:600;">Data Processing Agreement</summary>
+                                <p style="margin-top:0.5rem;line-height:1.6;">
+                                    &#x2022; No voice recordings stored permanently<br>
+                                    &#x2022; Transcripts auto-deleted after 5 minutes<br>
+                                    &#x2022; Parental consent for users under 18<br>
+                                    &#x2022; Right to deletion upon request<br>
+                                    &#x2022; Data processed in Kenya (sovereign cloud)
+                                </p>
+                            </details>
+                        </div>
+                    </div>
+                    """)
 
                 with gr.Column(visible=False) as general_sidebar:
                     gr.HTML('<div class="sidebar-title">Quick Questions</div>')
@@ -1051,7 +1035,7 @@ def create_app():
 
                 with gr.Column(visible=False) as transcriber_sidebar:
                     gr.HTML(f"""
-                    <div class="sidebar-title">🎙️ Transcriber Info</div>
+                    <div class="sidebar-title">{ICO['mic']} Transcriber Info</div>
                     <div class="transcriber-info">
                         <b>Model:</b> {kikuyu_transcriber.model_card or 'Not loaded'}<br>
                         <b>Type:</b> {'LLM' if kikuyu_transcriber.is_llm else 'CTC'}<br>
@@ -1063,7 +1047,7 @@ def create_app():
 
                 with gr.Column(visible=False) as library_sidebar:
                     gr.HTML(f"""
-                    <div class="sidebar-title">📖 Maktaba</div>
+                    <div class="sidebar-title">{ICO['book']} Maktaba</div>
                     <div class="library-info">
                         Kazi <b>{len(LIBRARY_METADATA)}</b> za fasihi.<br><br>
                         Chagua kitabu kwenye orodha ili kusoma.
@@ -1073,226 +1057,94 @@ def create_app():
             # ── Chat / Tool panels ───────────────────────────────
             with gr.Column(elem_classes="chat-main"):
 
-                # ── Kiswahili Container ──────────────────────────
                 with gr.Column(visible=True, elem_classes=["chat-container", "kiswahili-active"]) as kiswahili_container:
-                    with gr.Tabs() as kiswahili_tabs:
-
-                        with gr.Tab("💬 Msaidizi wa Fasihi"):
-                            kiswahili_chatbot = gr.Chatbot(
-                                height=300, type="messages",
-                                elem_classes="chatbot-container"
-                            )
+                    with gr.Tabs():
+                        with gr.Tab("Msaidizi wa Fasihi"):
+                            kiswahili_chatbot = gr.Chatbot(height=300, type="messages", elem_classes="chatbot-container", show_label=False)
                             with gr.Row():
-                                kiswahili_input = gr.Textbox(
-                                    placeholder="Andika swali lako hapa...",
-                                    lines=2, scale=4, elem_classes="textbox"
-                                )
+                                kiswahili_input = gr.Textbox(placeholder="Andika swali lako hapa...", lines=2, scale=4, elem_classes="textbox")
                             with gr.Row():
-                                kiswahili_send = gr.Button("✉️ Tuma Swali", variant="primary", size="lg", elem_classes="brown-primary-btn")
-                                kiswahili_clear = gr.Button("🗑️ Futa Majadiliano", size="lg", elem_classes="brown-primary-btn")
-                            confidence_display = gr.HTML(
-                                value="<div style='text-align:center;padding:10px;'>Confidence will appear here after response</div>"
-                            )
-                            gr.HTML("""
-                            <div style='margin-top:1rem;padding-top:1rem;border-top:1px solid #e1e5e9;
-                                        font-size:13px;color:#555;margin-bottom:0.5rem;'>
-                                ⚡ Maswali ya haraka:
-                            </div>
-                            """)
+                                kiswahili_send = gr.Button("Tuma Swali", variant="primary", size="lg", icon="/kaggle/working/icons/send.svg", elem_classes="brown-primary-btn")
+                                kiswahili_clear = gr.Button("Futa Majadiliano", size="lg", icon="/kaggle/working/icons/trash-2.svg", elem_classes="brown-primary-btn")
+                            confidence_display = gr.HTML(value="<div style='text-align:center;padding:10px;'>Confidence will appear here after response</div>")
+                            gr.HTML(f"<div style='margin-top:1rem;padding-top:1rem;border-top:1px solid #e1e5e9;font-size:13px;color:#555;margin-bottom:0.5rem;'>{ICO['zap']} Maswali ya haraka:</div>")
                             with gr.Row():
                                 kiswahili_btn1 = gr.Button("Nomino ni nini?", size="sm")
                                 kiswahili_btn2 = gr.Button("Aina za Nomino", size="sm")
                                 kiswahili_btn3 = gr.Button("Vitenzi ni nini?", size="sm")
                                 kiswahili_btn4 = gr.Button("Aina za Vitenzi", size="sm")
-
-                        with gr.Tab("🌱 Kilimo"):
+                        with gr.Tab("Kilimo"):
                             build_cbc_subject_tab(cbc_manager.get("kilimo_f1"))
-
-                        with gr.Tab("🔬 Biolojia"):
+                        with gr.Tab("Biolojia"):
                             build_cbc_subject_tab(cbc_manager.get("biolojia_f1"))
-
-                        with gr.Tab("⚗️ Kemia"):
+                        with gr.Tab("Kemia"):
                             build_cbc_subject_tab(cbc_manager.get("kemia_f1"))
 
-                # ── General Chat ─────────────────────────────────
                 with gr.Column(visible=False, elem_classes=["chat-container", "general-active"]) as general_container:
-                    general_chatbot = gr.Chatbot(
-                        height=300, type="messages",
-                        elem_classes="chatbot-container"
-                    )
+                    general_chatbot = gr.Chatbot(height=300, type="messages", elem_classes="chatbot-container", show_label=False)
                     with gr.Row():
-                        general_input = gr.Textbox(
-                            placeholder="Andika ujumbe wako hapa...",
-                            lines=2, scale=4, elem_classes="textbox"
-                        )
+                        general_input = gr.Textbox(placeholder="Andika ujumbe wako hapa...", lines=2, scale=4, elem_classes="textbox")
                     with gr.Row():
-                        general_send = gr.Button("✉️ Tuma Ujumbe", variant="primary", size="lg", elem_classes="general-send-btn")
-                        general_clear = gr.Button("🗑️ Futa Mazungumzo", size="lg", elem_classes="general-send-btn")
-                    sources_display = gr.HTML(
-                        value="<div style='text-align:center;padding:10px;'>Vyanzo vitaonekana hapa</div>"
-                    )
+                        general_send = gr.Button("Tuma Ujumbe", variant="primary", size="lg", icon="/kaggle/working/icons/send.svg", elem_classes="general-send-btn")
+                        general_clear = gr.Button("Futa Mazungumzo", size="lg", icon="/kaggle/working/icons/trash-2.svg", elem_classes="general-send-btn")
+                    sources_display = gr.HTML(value="<div style='text-align:center;padding:10px;'>Vyanzo vitaonekana hapa</div>")
 
-                # ── African Language Transcriber ─────────────────
                 with gr.Column(visible=False, elem_classes=["chat-container", "transcriber-active"]) as transcriber_container:
-                    gr.HTML("""
-                    <h3 style="font-family:'Playfair Display',serif;color:#6B35A8;margin-bottom:1rem;">
-                        🎙️ African Language Transcriber
-                    </h3>
-                    """)
+                    gr.HTML(f"<h3 style=\"font-family:'Playfair Display',serif;color:#6B35A8;margin-bottom:1rem;\">{ICO['mic']} African Language Transcriber</h3>")
                     with gr.Tabs():
-
-                        # ── Tab 1: YouTube Transcriber ────────────
-                        with gr.Tab("🎙️ YouTube Transcriber"):
+                        with gr.Tab("YouTube Transcriber"):
                             with gr.Column(elem_classes="transcriber-panel"):
-                                youtube_url = gr.Textbox(
-                                    label="YouTube URL",
-                                    placeholder="https://www.youtube.com/watch?v=...",
-                                    elem_classes="textbox"
-                                )
+                                youtube_url = gr.Textbox(label="YouTube URL", placeholder="https://www.youtube.com/watch?v=...", elem_classes="textbox")
                                 lang_code = gr.Dropdown(
-                                    choices=[
-                                        ("Kikuyu", "kik_Latn"),
-                                        ("Swahili", "swa_Latn"),
-                                        ("English", "eng_Latn"),
-                                        ("English (Kenyan)", "eng_Latn"),
-                                        ("Maragoli", "rag_Latn"),
-                                        ("Lumarachi", "lri_Latn"),
-                                        ("Kipsigis", "sgc_Latn"),
-                                        ("Nandi", "pko_Latn"),
-                                        ("Maasai", "mas_Latn"),
-                                        ("Somali", "som_Latn"),
-                                        ("Embu", "ebu_Latn"),
-                                        ("Turkana", "tuv_Latn"),
-                                        ("Gusii", "guz_Latn"),
-                                        ("Suba", "sxb_Latn"),
-                                        ("Bukusu", "bxk_Latn"),
-                                        ("Kalenjin", "kln_Latn"),
-                                        ("Luo", "luo_Latn"),
-                                        ("Luhya", "luy_Latn"),
-                                        ("Kamba", "kam_Latn"),
-                                        ("Somali", "som_Latn"),
-                                        ("Meru", "mer_Latn"),
-                                    ],
-                                    value="kik_Latn",
-                                    label="🌍 Language Code",
-                                    elem_classes="textbox"
+                                    choices=[("Kikuyu","kik_Latn"),("Swahili","swa_Latn"),("English","eng_Latn"),("English (Kenyan)","eng_Latn"),("Maragoli","rag_Latn"),("Lumarachi","lri_Latn"),("Kipsigis","sgc_Latn"),("Nandi","pko_Latn"),("Maasai","mas_Latn"),("Somali","som_Latn"),("Embu","ebu_Latn"),("Turkana","tuv_Latn"),("Gusii","guz_Latn"),("Suba","sxb_Latn"),("Bukusu","bxk_Latn"),("Kalenjin","kln_Latn"),("Luo","luo_Latn"),("Luhya","luy_Latn"),("Kamba","kam_Latn"),("Meru","mer_Latn")],
+                                    value="kik_Latn", label="Language Code", elem_classes="textbox"
                                 )
                                 with gr.Row():
-                                    enhance_toggle = gr.Checkbox(label="🔊 DeepFilterNet Enhancement", value=True)
-                                    vad_toggle = gr.Checkbox(label="🎙️ VAD Segmentation", value=False)
+                                    enhance_toggle = gr.Checkbox(label="DeepFilterNet Enhancement", value=True)
+                                    vad_toggle = gr.Checkbox(label="VAD Segmentation", value=False)
                                 with gr.Row():
-                                    transcribe_btn = gr.Button(
-                                        "🎙️ Transcribe Video", variant="primary", size="lg",
-                                        elem_classes="transcriber-btn"
-                                    )
-                                    transcribe_clear_btn = gr.Button(
-                                        "🗑️ Clear", size="lg", elem_classes="transcriber-btn"
-                                    )
+                                    transcribe_btn = gr.Button("Transcribe Video", variant="primary", size="lg", icon="/kaggle/working/icons/mic.svg", elem_classes="transcriber-btn")
+                                    transcribe_clear_btn = gr.Button("Clear", size="lg", icon="/kaggle/working/icons/trash-2.svg", elem_classes="transcriber-btn")
                             gr.HTML("<div style='margin:1rem 0;border-top:1px solid #e0d5f5;'></div>")
                             video_title = gr.Textbox(label="Video Title", interactive=False, elem_classes="textbox")
                             video_duration = gr.Textbox(label="Duration", interactive=False, elem_classes="textbox")
-                            preview_text = gr.Textbox(
-                                label="Preview (first 600 chars)", lines=5,
-                                interactive=False, elem_classes="textbox"
-                            )
-                            full_text = gr.Textbox(
-                                label="Full Transcription", lines=10,
-                                interactive=False, elem_classes="textbox"
-                            )
-                            transcription_status = gr.HTML(
-                                value="<div style='text-align:center;padding:10px;color:#888;'>Ready to transcribe</div>"
-                            )
-                            json_download = gr.File(label="📥 Download JSON", visible=False)
+                            preview_text = gr.Textbox(label="Preview (first 600 chars)", lines=5, interactive=False, elem_classes="textbox")
+                            full_text = gr.Textbox(label="Full Transcription", lines=10, interactive=False, elem_classes="textbox")
+                            transcription_status = gr.HTML(value="<div style='text-align:center;padding:10px;color:#888;'>Ready to transcribe</div>")
+                            json_download = gr.File(label="Download JSON", visible=False)
 
-                        # ── Tab 2: AI Notetaker ───────────────────
-                        with gr.Tab("📝 AI Notetaker"):
-                            gr.HTML("""
-                            <p style="color:#888;margin-bottom:1rem;">Record a lecture or paste a YouTube link, get structured notes instantly.</p>
-                            """)
-                            with gr.Column(elem_classes="transcriber-panel"):
-                                gr.HTML("<b style='color:#6B35A8;'>Option 1: Record or Upload Audio</b>")
-                                mic_audio = gr.Audio(
-                                    sources=["microphone", "upload"],
-                                    type="filepath",
-                                    format="wav",
-                                    label="🎙️ Record or Upload Lecture Audio"
-                                )
+                        with gr.Tab("AI Notetaker"):
+                            gr.HTML("<p style='color:#888;margin-bottom:1rem;'>Record a lecture or paste a YouTube link, get structured notes instantly.</p>")
+                            with gr.Column(elem_classes="notetaker-panel"):
+                                gr.HTML(f"<div class='option-badge'>{ICO['mic']} Option 1: Record or Upload Audio</div>")
+                                with gr.Column(elem_classes="record-btn-pulse"):
+                                    mic_audio = gr.Audio(sources=["microphone","upload"], type="filepath", format="wav", label="Record or Upload Lecture Audio")
                                 mic_audio_state = gr.State(None)
-                                gr.HTML("<div style='margin:1rem 0;border-top:1px solid #e0d5f5;'></div>")
-                                gr.HTML("<b style='color:#6B35A8;'>Option 2: YouTube URL</b>")
-                                notes_youtube_url = gr.Textbox(
-                                    label="YouTube URL",
-                                    placeholder="https://www.youtube.com/watch?v=...",
-                                    elem_classes="textbox"
-                                )
+                                gr.HTML("<div class='option-divider'>OR</div>")
+                                gr.HTML(f"<div class='option-badge'>{ICO['send']} Option 2: YouTube URL</div>")
+                                notes_youtube_url = gr.Textbox(label="YouTube URL", placeholder="https://www.youtube.com/watch?v=...", elem_classes="textbox")
                                 with gr.Row():
                                     notes_lang = gr.Dropdown(
-                                        choices=[
-                                            ("Kikuyu", "kik_Latn"),
-                                            ("Swahili", "swa_Latn"),
-                                            ("English (Kenyan)", "eng_Latn"),
-                                            ("Luo", "luo_Latn"),
-                                            ("Luhya", "luy_Latn"),
-                                            ("Lulogooli", "rag_Latn"),
-                                            ("Lubukusu", "bxk_Latn"),
-                                            ("Lumarachi", "lri_Latn"),
-                                            ("Kalenjin", "kln_Latn"),
-                                            ("Kipsigis", "sgc_Latn"),
-                                            ("Nandi", "pko_Latn"),
-                                            ("Kamba", "kam_Latn"),
-                                            ("Maasai", "mas_Latn"),
-                                            ("Somali", "som_Latn"),
-                                            ("Meru", "mer_Latn"),
-                                            ("Embu", "ebu_Latn"),
-                                            ("Turkana", "tuv_Latn"),
-                                            ("Gusii", "guz_Latn"),
-                                            ("Suba", "sxb_Latn"),
-                                        ],
-                                        value="swa_Latn",
-                                        label="🌍 Transcription Language"
+                                        choices=[("Kikuyu","kik_Latn"),("Swahili","swa_Latn"),("English (Kenyan)","eng_Latn"),("Luo","luo_Latn"),("Luhya","luy_Latn"),("Lulogooli","rag_Latn"),("Lubukusu","bxk_Latn"),("Lumarachi","lri_Latn"),("Kalenjin","kln_Latn"),("Kipsigis","sgc_Latn"),("Nandi","pko_Latn"),("Kamba","kam_Latn"),("Maasai","mas_Latn"),("Somali","som_Latn"),("Meru","mer_Latn"),("Embu","ebu_Latn"),("Turkana","tuv_Latn"),("Gusii","guz_Latn"),("Suba","sxb_Latn")],
+                                        value="swa_Latn", label="Transcription Language"
                                     )
-                                    notes_output_lang = gr.Radio(
-                                        choices=["English", "Swahili"],
-                                        value="English",
-                                        label="📄 Notes Language"
-                                    )
-                                notes_btn = gr.Button(
-                                    "📝 Generate Notes", variant="primary", size="lg",
-                                    elem_classes="transcriber-btn"
-                                )
-                            notes_status = gr.HTML(
-                                value="<div style='text-align:center;padding:10px;color:#888;'>Ready</div>"
-                            )
-                            notes_transcript = gr.Textbox(
-                                label="📜 Transcript", lines=5,
-                                interactive=False, elem_classes="textbox"
-                            )
-                            notes_output = gr.Textbox(
-                                label="📝 Structured Notes", lines=15,
-                                interactive=False, elem_classes="textbox"
-                            )
+                                    notes_output_lang = gr.Radio(choices=["English","Swahili"], value="English", label="Notes Language")
+                                notes_btn = gr.Button("Generate Notes", variant="primary", size="lg", icon="/kaggle/working/icons/file-text.svg", elem_classes="transcriber-btn")
+                            notes_status = gr.HTML(value="<div style='text-align:center;padding:10px;color:#888;'>Ready</div>")
+                            notes_transcript = gr.Textbox(label="Transcript", lines=5, interactive=False, elem_classes="textbox")
+                            notes_output = gr.Textbox(label="Structured Notes", lines=15, interactive=False, elem_classes="textbox")
 
-                # ── Maktaba ──────────────────────────────────────
                 with gr.Column(visible=False, elem_classes=["chat-container", "library-active"]) as library_container:
-                    gr.HTML("""
-                    <h3 style="font-family:'Playfair Display',serif;color:#C9A84C;margin-bottom:1rem;">
-                        📖 Maktaba ya Sauti
-                    </h3>
-                    """)
+                    gr.HTML(f"<h3 style=\"font-family:'Playfair Display',serif;color:#C9A84C;margin-bottom:1rem;\">{ICO['book']} Maktaba ya Sauti</h3>")
                     with gr.Column(visible=True) as book_list_panel:
-                        gr.HTML("""
-                        <div style='margin-bottom:1rem;'>
-                            <b style='font-family:Playfair Display,serif;font-size:1.1rem;'>Chagua Kitabu</b>
-                            <span style='color:#888;font-size:13px;margin-left:1rem;'>Kazi za Fasihi ya Kiswahili</span>
-                        </div>
-                        """)
-                        gr.HTML("<div style='color:#B8651B;font-weight:700;margin-bottom:0.5rem;font-size:0.9rem;'>📚 FASIHI YA KISWAHILI</div>")
+                        gr.HTML("<div style='margin-bottom:1rem;'><b style='font-family:Playfair Display,serif;font-size:1.1rem;'>Chagua Kitabu</b><span style='color:#888;font-size:13px;margin-left:1rem;'>Kazi za Fasihi ya Kiswahili</span></div>")
+                        gr.HTML(f"<div style='color:#B8651B;font-weight:700;margin-bottom:0.5rem;font-size:0.9rem;'>{ICO['library']} FASIHI YA KISWAHILI</div>")
                         swahili_books = [b for b in LIBRARY_METADATA if b["category"] == "Fasihi ya Kiswahili"]
                         swahili_btns = []
                         for book in swahili_books:
                             btn = gr.Button(f"{book['title']} — {book['author']}", elem_classes="sidebar-btn")
                             swahili_btns.append((btn, book))
-                        gr.HTML("<div style='color:#1F5D4F;font-weight:700;margin:1rem 0 0.5rem;font-size:0.9rem;'>🌍 TAFSIRI ZA KAZI ZA DUNIA</div>")
+                        gr.HTML(f"<div style='color:#1F5D4F;font-weight:700;margin:1rem 0 0.5rem;font-size:0.9rem;'>{ICO['globe']} TAFSIRI ZA KAZI ZA DUNIA</div>")
                         tafsiri_books = [b for b in LIBRARY_METADATA if b["category"] == "Tafsiri"]
                         tafsiri_btns = []
                         for book in tafsiri_books:
@@ -1304,12 +1156,10 @@ def create_app():
                         page_display = gr.Textbox(label="", lines=18, interactive=False, elem_classes="textbox")
                         page_info = gr.HTML("")
                         with gr.Row():
-                            prev_btn = gr.Button("⬅️ Kurasa Iliyopita", elem_classes="library-btn")
-                            back_to_list_btn = gr.Button("📚 Orodha ya Vitabu", elem_classes="library-btn")
-                            next_btn = gr.Button("Kurasa Inayofuata ➡️", elem_classes="library-btn")
-                    library_status = gr.HTML(
-                        value="<div style='text-align:center;padding:10px;color:#888;'>Chagua kitabu kusoma</div>"
-                    )
+                            prev_btn = gr.Button("Kurasa Iliyopita", elem_classes="library-btn", icon="/kaggle/working/icons/send.svg")
+                            back_to_list_btn = gr.Button("Orodha ya Vitabu", elem_classes="library-btn", icon="/kaggle/working/icons/library.svg")
+                            next_btn = gr.Button("Kurasa Inayofuata", elem_classes="library-btn", icon="/kaggle/working/icons/send.svg")
+                    library_status = gr.HTML(value="<div style='text-align:center;padding:10px;color:#888;'>Chagua kitabu kusoma</div>")
                     current_book_text = gr.State("")
                     current_page = gr.State(0)
 
@@ -1346,11 +1196,11 @@ def create_app():
             if not response:
                 response = "Samahani, sikupata jibu. Tafadhali jaribu tena."
             if sources:
-                src_html = "<div class='sources-display'><b>📚 Vyanzo:</b><br>"
+                src_html = f"<div class='sources-display'><b>{ICO['library']} Vyanzo:</b><br>"
                 for s in sources:
                     url = s.get('url', '')
                     title = s.get('title', 'Chanzo')
-                    lang_icon = " 🇸🇼" if s.get('language') == 'sw' else " 🌐"
+                    lang_icon = f" {ICO['globe']}"
                     if url and title:
                         src_html += f"• <b>{title}</b>{lang_icon}: <a href='{url}' target='_blank'>{url}</a><br>"
                     elif url:
@@ -1368,123 +1218,56 @@ def create_app():
             if not url.strip():
                 return ("", "", "", "", "<div style='color:#e74c3c;text-align:center;'>Please enter a YouTube URL</div>", gr.update(visible=False))
             try:
-                result, full, json_path = kikuyu_transcriber.process_video(
-                    url.strip(),
-                    lang.strip(),
-                    enhance=enhance,
-                    use_vad=use_vad
-                )
+                result, full, json_path = kikuyu_transcriber.process_video(url.strip(), lang.strip(), enhance=enhance, use_vad=use_vad)
                 preview = full[:600] + "..." if len(full) > 600 else full
-                status_html = f"""
-                <div style='text-align:center;padding:10px;background:#f0ebff;border-radius:8px;color:#5a3a8a;'>
-                    ✅ Transcription complete | Model: <b>{result['model']}</b> | Lang: <b>{result['lang']}</b> |
-                    Enhancement: <b>{'ON' if enhance else 'OFF'}</b> | VAD: <b>{'ON' if use_vad else 'OFF'}</b>
-                </div>
-                <script>
-                    (function() {{
-                        var script = document.createElement('script');
-                        script.src = 'https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js';
-                        script.onload = function() {{
-                            confetti({{
-                                particleCount: 150,
-                                spread: 80,
-                                origin: {{ y: 0.6 }},
-                                colors: ['#6B35A8', '#B8651B', '#C9A84C', '#1F5D4F', '#ffffff']
-                            }});
-                        }};
-                        document.head.appendChild(script);
-                    }})();
-                </script>"""
+                status_html = (
+                    "<div style='text-align:center;padding:10px;background:#f0ebff;border-radius:8px;color:#5a3a8a;'>"
+                    f"&#x2705; Transcription complete | Model: <b>{result['model']}</b> | Lang: <b>{result['lang']}</b> | "
+                    f"Enhancement: <b>{'ON' if enhance else 'OFF'}</b> | VAD: <b>{'ON' if use_vad else 'OFF'}</b>"
+                    "</div>"
+                    "<img src='' onerror='if(!window._confettiLoaded){var s=document.createElement(\"script\");s.src=\"https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js\";s.onload=function(){window._confettiLoaded=true;confetti({particleCount:150,spread:80,origin:{y:0.6},colors:[\"#6B35A8\",\"#B8651B\",\"#C9A84C\",\"#1F5D4F\",\"#ffffff\"]});};document.head.appendChild(s);}else{confetti({particleCount:150,spread:80,origin:{y:0.6},colors:[\"#6B35A8\",\"#B8651B\",\"#C9A84C\",\"#1F5D4F\",\"#ffffff\"]});}'>"
+                )
                 return (result["title"], f"{result['duration']} seconds", preview, full, status_html, gr.update(value=json_path, visible=True))
             except Exception as e:
-                error_html = f"<div style='color:#e74c3c;text-align:center;padding:10px;'>❌ Error: {str(e)}</div>"
-                return "", "", "", "", error_html, gr.update(visible=False)
+                return "", "", "", "", f"<div style='color:#e74c3c;text-align:center;padding:10px;'>Error: {str(e)}</div>", gr.update(visible=False)
 
         def clear_transcription():
             return ("", "", "", "", "<div style='text-align:center;padding:10px;color:#888;'>Ready to transcribe</div>", gr.update(visible=False))
 
         def generate_notes(audio_path, youtube_url, lang, notes_lang):
-            print(f"DEBUG audio_path: {audio_path} | youtube_url: {youtube_url}")
-            
-            # Determine source
             if youtube_url and youtube_url.strip():
                 try:
-                    result, full_text, _ = kikuyu_transcriber.process_video(
-                        youtube_url.strip(), lang, enhance=True, use_vad=False
-                    )
+                    result, full_text, _ = kikuyu_transcriber.process_video(youtube_url.strip(), lang, enhance=True, use_vad=False)
                 except Exception as e:
-                    return "", "", f"<div style='color:#e74c3c;text-align:center;padding:10px;'>❌ YouTube Error: {str(e)}</div>"
+                    return "", "", f"<div style='color:#e74c3c;text-align:center;padding:10px;'>YouTube Error: {str(e)}</div>"
             elif audio_path:
                 try:
-                    result, full_text, _ = kikuyu_transcriber.process_file(
-                        audio_path, lang=lang, enhance=True, use_vad=False
-                    )
+                    result, full_text, _ = kikuyu_transcriber.process_file(audio_path, lang=lang, enhance=True, use_vad=False)
                 except Exception as e:
-                    return "", "", f"<div style='color:#e74c3c;text-align:center;padding:10px;'>❌ Audio Error: {str(e)}</div>"
+                    return "", "", f"<div style='color:#e74c3c;text-align:center;padding:10px;'>Audio Error: {str(e)}</div>"
             else:
                 return "", "", "<div style='color:#e74c3c;text-align:center;padding:10px;'>Please record audio or paste a YouTube URL</div>"
 
             if notes_lang == "Swahili":
-                prompt = f"""Hii ni nakala ya hotuba iliyorekodiwa. Inaweza kuwa katika lugha yoyote ya Kenya (Kikuyu, Kalenjin, Luo, Luhya, Kamba, n.k.).
-            Tafsiri na piga muhtasari kwa Kiswahili. Toa muundo huu:
-
-            ## Tafsiri Kamili
-            (Tafsiri nzima ya nakala kwa Kiswahili, neno kwa neno)
-
-            ## Muhtasari
-            ...
-
-            ## Mawazo Makuu
-            - ...
-
-            ## Maneno Muhimu na Maana Yake
-            - neno: maana
-
-            ## Mifano
-            - ...
-
-            Nakala:
-            {full_text}"""
+                prompt = f"Hii ni nakala ya hotuba. Tafsiri na fanya muhtasari kwa Kiswahili:\n\n## Tafsiri Kamili\n## Muhtasari\n## Mawazo Makuu\n## Maneno Muhimu\n## Mifano\n\nNakala:\n{full_text}"
             else:
-                prompt = f"""This is a transcript that may be in any Kenyan language (Kikuyu, Kalenjin, Luo, Luhya, Kamba, etc.).
-            Translate and summarize it in English. Generate structured notes:
-
-            ## Verbatim Translation
-            (Full word-for-word translation of the transcript into English)
-
-            ## Summary
-            ...
-
-            ## Key Ideas
-            - ...
-
-            ## Definitions
-            - term: definition
-
-            ## Examples
-            - ...
-
-            Transcript:
-            {full_text}"""
+                prompt = f"Translate and summarize this transcript in English:\n\n## Verbatim Translation\n## Summary\n## Key Ideas\n## Definitions\n## Examples\n\nTranscript:\n{full_text}"
 
             response = gemini_client.generate_content(prompt)
             notes = response.text
             lang_display = "Swahili" if lang == "swa_Latn" else "English"
-            status_html = f"""
-            <div style='text-align:center;padding:10px;background:#f0ebff;border-radius:8px;color:#5a3a8a;'>
-                ✅ Notes generated | Transcription: <b>{lang_display}</b> | Notes: <b>{notes_lang}</b>
-            </div>"""
+            status_html = (
+                "<div style='text-align:center;padding:10px;background:#f0ebff;border-radius:8px;color:#5a3a8a;'>"
+                f"&#x2705; Notes generated | Transcription: <b>{lang_display}</b> | Notes: <b>{notes_lang}</b>"
+                "</div>"
+                "<img src='' onerror='if(!window._confettiLoaded){var s=document.createElement(\"script\");s.src=\"https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js\";s.onload=function(){window._confettiLoaded=true;confetti({particleCount:150,spread:80,origin:{y:0.6},colors:[\"#6B35A8\",\"#B8651B\",\"#C9A84C\",\"#1F5D4F\",\"#ffffff\"]});};document.head.appendChild(s);}else{confetti({particleCount:150,spread:80,origin:{y:0.6},colors:[\"#6B35A8\",\"#B8651B\",\"#C9A84C\",\"#1F5D4F\",\"#ffffff\"]});}'>"
+            )
             return full_text, notes, status_html
-            
 
         def open_book(filename, title, author):
             text = load_book_text(filename)
             page_text, page_num, total = get_page(text, 0)
-            title_html = f"""
-            <div style='margin-bottom:1rem;'>
-                <h4 style='font-family:Playfair Display,serif;color:#C9A84C;margin:0;'>{title}</h4>
-                <span style='color:#888;font-size:13px;'>{author}</span>
-            </div>"""
+            title_html = f"<div style='margin-bottom:1rem;'><h4 style='font-family:Playfair Display,serif;color:#C9A84C;margin:0;'>{title}</h4><span style='color:#888;font-size:13px;'>{author}</span></div>"
             info_html = f"<div style='text-align:center;color:#888;font-size:13px;'>Ukurasa {page_num+1} / {total}</div>"
             return (gr.update(visible=False), gr.update(visible=True), page_text, title_html, info_html, text, 0)
 
@@ -1492,11 +1275,11 @@ def create_app():
             _, _, total = get_page(text, 0)
             new_page = max(0, min(page + direction, total - 1))
             page_text, page_num, total = get_page(text, new_page)
-            info_html = f"<div style='text-align:center;color:#888;font-size:13px;'>Ukurasa {page_num+1} / {total}</div>"
-            return page_text, info_html, new_page
+            return page_text, f"<div style='text-align:center;color:#888;font-size:13px;'>Ukurasa {page_num+1} / {total}</div>", new_page
 
         def back_to_booklist():
             return gr.update(visible=True), gr.update(visible=False)
+
         # ════════════════════════════════════════════════════════
         # TOGGLE FUNCTIONS
         # ════════════════════════════════════════════════════════
@@ -1547,15 +1330,19 @@ def create_app():
         transcriber_toggle.click(show_transcriber, outputs=toggle_outputs)
         library_toggle.click(show_library, outputs=toggle_outputs)
 
+        # ── Login / logout wiring ────────────────────────────────
+        def do_login(email, password):
+            return gr.update(visible=False), gr.update(visible=True)
+        login_btn.click(do_login, inputs=[login_email, login_pass], outputs=[login_panel, profile_panel])
+        signup_btn.click(do_login, inputs=[login_email, login_pass], outputs=[login_panel, profile_panel])
+        logout_btn.click(lambda: (gr.update(visible=True), gr.update(visible=False)), outputs=[login_panel, profile_panel])
+
         # ════════════════════════════════════════════════════════
         # MAKTABA WIRING
         # ════════════════════════════════════════════════════════
         reader_outputs = [book_list_panel, reader_panel, page_display, book_title_display, page_info, current_book_text, current_page]
         for btn, book in swahili_btns + tafsiri_btns:
-            btn.click(
-                lambda f=book["filename"], t=book["title"], a=book["author"]: open_book(f, t, a),
-                outputs=reader_outputs
-            )
+            btn.click(lambda f=book["filename"], t=book["title"], a=book["author"]: open_book(f, t, a), outputs=reader_outputs)
         prev_btn.click(lambda text, page: turn_page(text, page, -1), inputs=[current_book_text, current_page], outputs=[page_display, page_info, current_page])
         next_btn.click(lambda text, page: turn_page(text, page, 1), inputs=[current_book_text, current_page], outputs=[page_display, page_info, current_page])
         back_to_list_btn.click(back_to_booklist, outputs=[book_list_panel, reader_panel])
@@ -1566,7 +1353,6 @@ def create_app():
         kiswahili_input.submit(respond_kiswahili, [kiswahili_input, kiswahili_chatbot], [kiswahili_input, kiswahili_chatbot, confidence_display])
         kiswahili_send.click(respond_kiswahili, [kiswahili_input, kiswahili_chatbot], [kiswahili_input, kiswahili_chatbot, confidence_display])
         kiswahili_clear.click(lambda: ("", [], "<div style='text-align:center;padding:10px;'>Conversation cleared</div>"), outputs=[kiswahili_input, kiswahili_chatbot, confidence_display])
-
         general_input.submit(respond_general, [general_input, general_chatbot], [general_input, general_chatbot, sources_display])
         general_send.click(respond_general, [general_input, general_chatbot], [general_input, general_chatbot, sources_display])
         general_clear.click(lambda: ("", [], "<div style='text-align:center;padding:10px;'>Mazungumzo yamefutwa</div>"), outputs=[general_input, general_chatbot, sources_display])
@@ -1577,25 +1363,9 @@ def create_app():
         transcribe_outputs = [video_title, video_duration, preview_text, full_text, transcription_status, json_download]
         transcribe_btn.click(run_transcription, [youtube_url, lang_code, enhance_toggle, vad_toggle], transcribe_outputs)
         transcribe_clear_btn.click(clear_transcription, outputs=transcribe_outputs)
-
-        # ── Notetaker Wiring ─────────────────────────────────
-        mic_audio.change(
-            lambda x: x,
-            inputs=[mic_audio],
-            outputs=[mic_audio_state]
-        )
-        mic_audio.stop_recording(
-            lambda x: x,
-            inputs=[mic_audio],
-            outputs=[mic_audio_state]
-        )
-        notes_btn.click(
-            generate_notes,
-            inputs=[mic_audio_state, notes_youtube_url, notes_lang, notes_output_lang],
-            outputs=[notes_transcript, notes_output, notes_status]
-        )
-
-
+        mic_audio.change(lambda x: x, inputs=[mic_audio], outputs=[mic_audio_state])
+        mic_audio.stop_recording(lambda x: x, inputs=[mic_audio], outputs=[mic_audio_state])
+        notes_btn.click(generate_notes, inputs=[mic_audio_state, notes_youtube_url, notes_lang, notes_output_lang], outputs=[notes_transcript, notes_output, notes_status])
 
         # ════════════════════════════════════════════════════════
         # QUICK ACTION BUTTONS
@@ -1613,7 +1383,6 @@ def create_app():
         kiswahili_btn2.click(kiswahili_quick2, [kiswahili_chatbot], [kiswahili_input, kiswahili_chatbot, confidence_display])
         kiswahili_btn3.click(kiswahili_quick3, [kiswahili_chatbot], [kiswahili_input, kiswahili_chatbot, confidence_display])
         kiswahili_btn4.click(kiswahili_quick4, [kiswahili_chatbot], [kiswahili_input, kiswahili_chatbot, confidence_display])
-
         general_btn1.click(general_quick1, [general_chatbot], [general_input, general_chatbot, sources_display])
         general_btn2.click(general_quick2, [general_chatbot], [general_input, general_chatbot, sources_display])
         general_btn3.click(general_quick3, [general_chatbot], [general_input, general_chatbot, sources_display])
@@ -1624,7 +1393,6 @@ def create_app():
 if __name__ == "__main__":
     os.environ['TORCH_LOGS'] = ''
     os.environ['TORCHDYNAMO_VERBOSE'] = '0'
-
     try:
         if torch.cuda.is_available():
             print(f"GPU detected: {torch.cuda.get_device_name(0)}")
@@ -1632,7 +1400,6 @@ if __name__ == "__main__":
             torch.backends.cudnn.allow_tf32 = True
     except Exception:
         pass
-
     print("Creating Gradio app...")
     app = create_app()
     print("Launching...")
