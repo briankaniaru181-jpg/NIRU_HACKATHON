@@ -6,7 +6,7 @@ CBC Curriculum — SAUTI Module
 Generic module for ALL CBC subjects.
 Fetches live content from Opiq, provides:
   1. READER MODE  — full chapter in English + Swahili (paginated)
-  2. RAG MODE     — student asks a question, Groq answers in Swahili
+  2. RAG MODE     — student asks a question, Gemini answers in Swahili
 
 To add a new subject: just add a URL to CBC_REGISTRY. Nothing else changes.
 """
