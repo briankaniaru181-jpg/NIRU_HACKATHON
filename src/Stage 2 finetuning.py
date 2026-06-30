@@ -48,17 +48,17 @@ print("=" * 60 + "\n")
 gc.collect()
 torch.cuda.empty_cache()
 
-# ============================
+
 # 1. LOAD TOKENIZER
-# ============================
+
 print("Loading tokenizer...")
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 tokenizer.pad_token = tokenizer.eos_token
 tokenizer.padding_side = "right"
 
-# ============================
+
 # 2. LOAD AND PREPARE DATASET
-# ============================
+
 print("Loading dataset...")
 dataset = load_dataset('json', data_files=DATASET_PATH, split='train')
 
@@ -73,9 +73,8 @@ eval_dataset = dataset['test']
 print(f"Training examples: {len(train_dataset)}")
 print(f"Validation examples: {len(eval_dataset)}")
 
-# ============================
 # 3. FORMATTING FUNCTION
-# ============================
+
 def format_conversation(example):
     """
     Format conversations with Gemma-specific tokens.
@@ -106,9 +105,9 @@ print("-" * 60)
 print(train_dataset[0]['text'])
 print("-" * 60 + "\n")
 
-# ============================
+
 # 4. TOKENIZATION FUNCTION
-# ============================
+
 def tokenize_function(examples):
     """Tokenize the text data"""
     return tokenizer(
@@ -142,9 +141,9 @@ eval_dataset.set_format(type="torch", columns=["input_ids", "attention_mask"])
 print(f"Tokenized training dataset: {train_dataset}")
 print(f"Tokenized eval dataset: {eval_dataset}")
 
-# ============================
+
 # 5. QUANTIZATION CONFIG (4-bit NF4)
-# ============================
+
 print("\nConfiguring 4-bit quantization...")
 bnb_config = BitsAndBytesConfig(
     load_in_4bit=True,
@@ -153,9 +152,9 @@ bnb_config = BitsAndBytesConfig(
     bnb_4bit_compute_dtype=torch.float16  # FP16 for computation
 )
 
-# ============================
+
 # 6. LOAD MODEL
-# ============================
+
 print("Loading base model with quantization...")
 model = AutoModelForCausalLM.from_pretrained(
     MODEL_NAME,
@@ -169,9 +168,9 @@ model = AutoModelForCausalLM.from_pretrained(
 model = prepare_model_for_kbit_training(model)
 model.config.use_cache = False  # Required for gradient checkpointing
 
-# ============================
+
 # 7. LORA CONFIGURATION
-# ============================
+
 print("Configuring LoRA...")
 peft_config = LoraConfig(
     r=8,  # Rank
@@ -200,9 +199,8 @@ def print_trainable_parameters(model):
 
 print_trainable_parameters(model)
 
-# ============================
 # 8. DATA COLLATOR
-# ============================
+
 from transformers import DataCollatorForLanguageModeling
 
 data_collator = DataCollatorForLanguageModeling(
@@ -210,9 +208,9 @@ data_collator = DataCollatorForLanguageModeling(
     mlm=False  # We're doing causal LM, not masked LM
 )
 
-# ============================
+
 # 9. CUSTOM CALLBACK FOR TRACKING
-# ============================
+
 class MetricsCallback(TrainerCallback):
     """Custom callback to track and save metrics"""
     
@@ -318,9 +316,9 @@ class MetricsCallback(TrainerCallback):
 # Initialize callback
 metrics_callback = MetricsCallback()
 
-# ============================
+
 # 10. TRAINING ARGUMENTS
-# ============================
+
 print("Setting up training arguments...")
 training_args = TrainingArguments(
     output_dir=OUTPUT_DIR,
@@ -349,9 +347,9 @@ training_args = TrainingArguments(
     dataloader_pin_memory=True
 )
 
-# ============================
+
 # 11. TRAINER SETUP
-# ============================
+
 print("Initializing trainer...")
 
 trainer = Trainer(
@@ -366,18 +364,18 @@ trainer = Trainer(
     ]
 )
 
-# ============================
+
 # 12. TRAIN MODEL
-# ============================
+
 print("\n" + "="*60)
 print("STARTING TRAINING")
 print("="*60 + "\n")
 
 trainer.train()
 
-# ============================
+
 # 13. SAVE MODEL
-# ============================
+
 print("\n" + "="*60)
 print("SAVING MODEL")
 print("="*60 + "\n")
@@ -395,9 +393,9 @@ print(f"\n Training complete!")
 print(f" Model saved to: {OUTPUT_DIR}")
 print(f" Merged model saved to: {OUTPUT_DIR}/merged_model")
 
-# ============================
+
 # 14. INFERENCE TEST
-# ============================
+
 print("\n" + "="*60)
 print("TESTING FINE-TUNED MODEL")
 print("="*60 + "\n")
