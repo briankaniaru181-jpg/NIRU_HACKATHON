@@ -2,7 +2,7 @@
 """
 
 STAGE 1: Swahili Linguistic Foundation - Continued Pretraining
-FINAL COMPLETE VERSION - KAGGLE OPTIMIZED
+
 
 WITH COMPREHENSIVE MONITORING, TRACKING, CHECKPOINT RECOVERY & SWAHILI EARLY STOPPING
 
@@ -78,7 +78,7 @@ sys.modules['transformers.integrations.tensor_parallel'] = mock
 
 print(" Aggressive tensor_parallel mock installed")
 
-# ========== PYTORCH COMPATIBILITY ==========
+# PYTORCH COMPATIBILITY 
 import torch
 print(f"🔧 PyTorch version: {torch.__version__}")
 
@@ -175,7 +175,7 @@ except ImportError:
     )
     print("Installed and imported PEFT")
 
-# ========== KAGGLE-SPECIFIC OPTIMIZATIONS ==========
+#  KAGGLE-SPECIFIC OPTIMIZATIONS 
 def kaggle_specific_setup():
     """Extra safety and optimization for Kaggle P100 environment"""
     print("\n" + "="*70)
@@ -216,7 +216,7 @@ def kaggle_specific_setup():
     print("="*70 + "\n")
 
 
-# ========== MEMORY MONITOR ==========
+#  MEMORY MONITOR 
 class MemoryMonitor:
     """Monitor GPU and CPU memory usage"""
     
@@ -271,7 +271,7 @@ class MemoryMonitor:
             "total_logs": len(self.memory_log),
         }
 
-# ========== CHECKPOINT RECOVERY MANAGER ==========
+#  CHECKPOINT RECOVERY MANAGER 
 class CheckpointRecoveryManager:
     """Manages checkpoint creation, restoration, and recovery"""
     
@@ -386,7 +386,7 @@ class CheckpointRecoveryManager:
         except Exception as e:
             print(f"Error in cleanup: {str(e)}")
 
-# ========== SWAHILI SCORE EARLY STOPPING ==========
+#  SWAHILI SCORE EARLY STOPPING 
 class SwahiliScoreEarlyStopping(EarlyStoppingCallback):
     """Early stop if Swahili quality plateaus"""
     
@@ -445,7 +445,7 @@ class SwahiliScoreEarlyStopping(EarlyStoppingCallback):
                 print(f"   Stopping training...")
                 control.should_training_stop = True
 
-# ========== TRACKING CONFIGURATION ==========
+# TRACKING CONFIGURATION 
 @dataclass
 class TrackingConfig:
     """Configuration for comprehensive monitoring"""
@@ -524,7 +524,7 @@ class TrainingConfig:
     SWAHILI_STOPPING_PATIENCE: int = 3
     SWAHILI_STOPPING_THRESHOLD: float = 0.01
 
-# ========== SEQUENCE PACKING IMPLEMENTATION ==========
+#  SEQUENCE PACKING IMPLEMENTATION 
 class SequencePacker:
     """Implements sequence packing for efficient token usage"""
     
@@ -584,7 +584,7 @@ class SequencePacker:
             "labels": torch.tensor(labels),
         }
 
-# ========== METRICS TRACKER ==========
+# METRICS TRACKER 
 class MetricsTracker:
     """Comprehensive metrics tracking and analysis"""
     
@@ -1076,7 +1076,7 @@ class MetricsTracker:
         
         print("\n" + "="*70)
 
-# ========== CUSTOM CALLBACK FOR TRACKING ==========
+#  CUSTOM CALLBACK FOR TRACKING 
 class ComprehensiveMetricsCallback(TrainerCallback):
     """Callback for comprehensive metrics tracking"""
     
@@ -1175,7 +1175,7 @@ class ComprehensiveMetricsCallback(TrainerCallback):
         except Exception as e:
             print(f" Error caching sample: {str(e)}")
 
-# ========== JSONL DATASET LOADING WITH SEQUENCE PACKING ==========
+#  JSONL DATASET LOADING WITH SEQUENCE PACKING 
 def load_jsonl_dataset_with_packing(
     tokenizer, 
     data_path: str, 
@@ -1256,7 +1256,7 @@ def load_jsonl_dataset_with_packing(
     
     return dataset
 
-# ========== MAIN TRAINING SCRIPT ==========
+#  MAIN TRAINING SCRIPT 
 def setup_environment():
     """Setup environment and print system info"""
     print("=" * 70)
