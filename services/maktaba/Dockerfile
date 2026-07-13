@@ -2,15 +2,13 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install dependencies
-COPY requirements.txt .
+COPY services/maktaba/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy service code
-COPY main.py .
+COPY services/maktaba/main.py .
 
-# Expose port
+COPY LITERARY WORKS ./data/LITERARY WORKS
+
 EXPOSE 8004
 
-# Start service
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8004"]
