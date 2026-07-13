@@ -16,7 +16,7 @@ TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY", "")
 
 # Configure Gemini
 genai.configure(api_key=GOOGLE_API_KEY)
-gemini_client = genai.GenerativeModel("gemini-3.1-flash-lite-preview")
+gemini_client = genai.GenerativeModel("gemini-3.1-flash-lite")
 
 # ── Request / Response models ─────────────────────────────
 class ChatRequest(BaseModel):
