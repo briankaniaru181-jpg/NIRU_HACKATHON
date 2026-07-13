@@ -7,7 +7,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY services/maktaba/main.py .
 
-COPY LITERARY WORKS ./data/LITERARY WORKS
+COPY ["LITERARY WORKS", "./data/LITERARY WORKS"]
 
 EXPOSE 8004
 
