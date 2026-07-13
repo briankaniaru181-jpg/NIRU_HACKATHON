@@ -1,7 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import os
-import json
 from typing import List
 
 app = FastAPI(title="Maktaba Service")
@@ -10,6 +9,33 @@ app = FastAPI(title="Maktaba Service")
 DATA_PATH = os.environ.get("DATA_PATH", "./data")
 LIBRARY_PATH = os.path.join(DATA_PATH, "LITERARY WORKS")
 WORDS_PER_PAGE = 500
+
+# ── Debug endpoint ──────────────────────────────────────
+@app.get("/debug")
+def debug():
+    return {
+        "cwd": os.getcwd(),
+        "data_path": DATA_PATH,
+        "library_path": LIBRARY_PATH,
+        "app_exists": os.path.exists("/app"),
+        "data_exists": os.path.exists("/app/data"),
+        "library_exists": os.path.exists(LIBRARY_PATH),
+        "app_contents": (
+            os.listdir("/app")
+            if os.path.exists("/app")
+            else "missing"
+        ),
+        "data_contents": (
+            os.listdir("/app/data")
+            if os.path.exists("/app/data")
+            else "missing"
+        ),
+        "library_contents": (
+            os.listdir(LIBRARY_PATH)
+            if os.path.exists(LIBRARY_PATH)
+            else "missing"
+        ),
+    }
 
 # ── Book catalogue ───────────────────────────────────────
 LIBRARY_METADATA = [
@@ -118,19 +144,19 @@ def list_books():
 
 @app.post("/page", response_model=PageResponse)
 def get_page(request: PageRequest):
-    # Find the book
     book = next(
         (b for b in LIBRARY_METADATA if b["id"] == request.book_id),
         None
     )
+
     if not book:
         raise HTTPException(
             status_code=404,
             detail=f"Book '{request.book_id}' not found"
         )
 
-    # Read the file
     path = os.path.join(LIBRARY_PATH, book["filename"])
+
     try:
         with open(path, "r", encoding="utf-8") as f:
             text = f.read()
@@ -145,15 +171,19 @@ def get_page(request: PageRequest):
             detail=f"Could not read book: {str(e)}"
         )
 
-    # Paginate
     words = text.split()
+
     total_pages = max(
         1,
         (len(words) + WORDS_PER_PAGE - 1) // WORDS_PER_PAGE
     )
+
     page = max(0, min(request.page, total_pages - 1))
     start = page * WORDS_PER_PAGE
-    page_text = " ".join(words[start:start + WORDS_PER_PAGE])
+
+    page_text = " ".join(
+        words[start:start + WORDS_PER_PAGE]
+    )
 
     return PageResponse(
         title=book["title"],
