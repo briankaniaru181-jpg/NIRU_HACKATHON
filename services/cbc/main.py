@@ -5,6 +5,7 @@ import re
 import requests
 from typing import List, Dict, Optional
 import google.generativeai as genai
+from bs4 import BeautifulSoup
 
 app = FastAPI(title="CBC Service")
 
@@ -14,7 +15,7 @@ GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "")
 # Configure Gemini
 genai.configure(api_key=GOOGLE_API_KEY)
 
-# ── Initialize Gemini with the working model ─────────────
+# ── Initialize Gemini ─────────────────────────────────────
 print("🔄 Initializing Gemini for CBC...")
 print(f"API Key set: {bool(GOOGLE_API_KEY)}")
 
@@ -22,33 +23,26 @@ gemini_client = None
 selected_model = "None"
 
 try:
-    # Use the EXACT same model that worked in General service
     gemini_client = genai.GenerativeModel("gemini-3.1-flash-lite")
     test_response = gemini_client.generate_content("Sema jambo")
     print(f"✅ Gemini 3.1 Flash-Lite connected successfully!")
-    print(f"Test response: {test_response.text[:50]}...")
     selected_model = "gemini-3.1-flash-lite"
 except Exception as e:
     print(f"⚠️ Gemini 3.1 Flash-Lite failed: {e}")
-    
     try:
-        # Fallback to 2.0 Flash-Lite
         gemini_client = genai.GenerativeModel("gemini-2.0-flash-lite")
         test_response = gemini_client.generate_content("Sema jambo")
         print(f"✅ Gemini 2.0 Flash-Lite connected successfully!")
         selected_model = "gemini-2.0-flash-lite"
     except Exception as e2:
         print(f"⚠️ Gemini 2.0 Flash-Lite failed: {e2}")
-        
         try:
-            # Fallback to 1.5 Flash
             gemini_client = genai.GenerativeModel("gemini-1.5-flash")
             test_response = gemini_client.generate_content("Sema jambo")
             print(f"✅ Gemini 1.5 Flash connected successfully!")
             selected_model = "gemini-1.5-flash"
         except Exception as e3:
             print(f"❌ All Gemini models failed!")
-            print(f"Final error: {e3}")
             gemini_client = None
             selected_model = "None"
 
@@ -66,38 +60,43 @@ class CBCResponse(BaseModel):
     source: str = "Opiq CBC"
     confidence: float = 0.0
 
-# ── Opiq subject URLs ─────────────────────────────────────
+# ── Opiq subject URLs (ONLY 3 SUBJECTS) ──────────────────
 CBC_REGISTRY = {
     "kilimo_f1": {
         "name": "Kilimo",
-        "url": "https://opiq.co.ke/books/kilimo-f1",
+        "url": "https://opiq.co.ke/kit/78/chapter/3980",
         "grade": "Form 1"
     },
     "biolojia_f1": {
         "name": "Biolojia",
-        "url": "https://opiq.co.ke/books/biolojia-f1",
+        "url": "https://opiq.co.ke/kit/36/chapter/1579",
         "grade": "Form 1"
     },
     "kemia_f1": {
         "name": "Kemia",
-        "url": "https://opiq.co.ke/books/kemia-f1",
+        "url": "https://opiq.co.ke/kit/37/chapter/1599",
         "grade": "Form 1"
-    },
-    "fizikia_f1": {
-        "name": "Fizikia",
-        "url": "https://opiq.co.ke/books/fizikia-f1",
-        "grade": "Form 1"
-    },
-    "hisabati_f1": {
-        "name": "Hisabati",
-        "url": "https://opiq.co.ke/books/hisabati-f1",
-        "grade": "Form 1"
-    },
+    }
 }
 
-# ── Opiq scraper ──────────────────────────────────────────
+# ── Opiq noise filter (from your Kaggle code) ────────────
+OPIQ_NOISE = {
+    "more like this", "more options", "copy link", "report mistake",
+    "find more content on the subject", "chapter contents",
+    "go to main content", "main menu", "context menu",
+    "opiq score", "tasks", "chapter is studied",
+    "text assistance trial version", "add content", "add file", "add text",
+    "files to be added", "report error", "opiq uses cookies",
+    "allow mandatory", "please wait", "log in", "join", "search",
+    "about", "library", "accessibility", "eula", "privacy notice",
+    "use of cookies", "terms and conditions", "service provided by",
+    "in english", "loading", "success", "cancel", "back", "send",
+    "remove", "close menu", "error", "close", "nbs!", "nb!", "order",
+}
+
+# ── Opiq scraper with BeautifulSoup ──────────────────────
 def fetch_opiq_content(subject_id: str) -> str:
-    """Fetch chapter content from Opiq"""
+    """Fetch chapter content from Opiq using the correct chapter URLs"""
     if subject_id not in CBC_REGISTRY:
         return ""
 
@@ -105,24 +104,54 @@ def fetch_opiq_content(subject_id: str) -> str:
     url = subject["url"]
 
     try:
+        print(f"🌐 Fetching: {url}")
         headers = {
             "User-Agent": (
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36"
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
             )
         }
         response = requests.get(url, headers=headers, timeout=15)
-        if response.status_code == 200:
-            # Strip HTML tags
-            text = re.sub(r'<[^>]+>', ' ', response.text)
-            # Clean whitespace
-            text = re.sub(r'\s+', ' ', text).strip()
-            # Return first 4000 chars as context
-            return text[:4000]
+        response.raise_for_status()
+        
+        soup = BeautifulSoup(response.text, "html.parser")
+        
+        # Remove script, style, nav, footer, header elements
+        for tag in soup(["script", "style", "nav", "footer", 
+                        "header", "button", "form", "iframe", "noscript"]):
+            tag.decompose()
+        
+        # Get text and clean it
+        raw_text = soup.get_text(separator="\n", strip=True)
+        raw_text = re.sub(r"([a-z])\n([a-z])", r"\1 \2", raw_text)
+        raw_text = re.sub(r"([a-z])([A-Z])", r"\1 \2", raw_text)
+        raw_text = raw_text.replace("–", " – ")
+        
+        # Filter lines
+        lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
+        lines = [re.sub(r"[ \t]+", " ", line) for line in lines]
+        
+        content_lines = []
+        for line in lines:
+            line_lower = line.lower()
+            if len(line) < 4:
+                continue
+            if line_lower in OPIQ_NOISE:
+                continue
+            if line.startswith("http") or line.startswith("P.O") or line.startswith("+"):
+                continue
+            if "@" in line and "." in line:
+                continue
+            content_lines.append(line)
+        
+        cleaned = "\n".join(content_lines)
+        print(f"✅ Fetched {len(cleaned)} chars from Opiq")
+        return cleaned[:4000]
+        
     except Exception as e:
-        print(f"Opiq fetch error: {e}")
-
-    return ""
+        print(f"❌ Opiq fetch error: {e}")
+        return ""
 
 # ── Gemini generation ─────────────────────────────────────
 def generate_answer(

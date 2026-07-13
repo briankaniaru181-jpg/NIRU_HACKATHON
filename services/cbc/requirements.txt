@@ -3,3 +3,4 @@ uvicorn
 pydantic
 google-generativeai
 requests
+beautifulsoup4
