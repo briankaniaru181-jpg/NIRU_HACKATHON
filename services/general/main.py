@@ -16,7 +16,35 @@ TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY", "")
 
 # Configure Gemini
 genai.configure(api_key=GOOGLE_API_KEY)
-gemini_client = genai.GenerativeModel("gemini-3.1-flash-lite")
+
+# ── Use Gemini 3.1 Flash-Lite ────────────────────────────
+print("🔄 Initializing Gemini 3.1 Flash-Lite...")
+try:
+    gemini_client = genai.GenerativeModel("gemini-3.1-flash-lite")
+    # Test the connection
+    test_response = gemini_client.generate_content("Sema jambo")
+    print(f"✅ Gemini 3.1 Flash-Lite connected successfully!")
+    selected_model = "gemini-3.1-flash-lite"
+except Exception as e:
+    print(f"⚠️ Gemini 3.1 Flash-Lite failed: {e}")
+    print("🔄 Falling back to Gemini 2.0 Flash-Lite...")
+    try:
+        gemini_client = genai.GenerativeModel("gemini-2.0-flash-lite")
+        test_response = gemini_client.generate_content("Sema jambo")
+        print(f"✅ Gemini 2.0 Flash-Lite connected successfully!")
+        selected_model = "gemini-2.0-flash-lite"
+    except Exception as e2:
+        print(f"⚠️ Gemini 2.0 Flash-Lite failed: {e2}")
+        print("🔄 Falling back to Gemini 1.5 Flash...")
+        try:
+            gemini_client = genai.GenerativeModel("gemini-1.5-flash")
+            test_response = gemini_client.generate_content("Sema jambo")
+            print(f"✅ Gemini 1.5 Flash connected successfully!")
+            selected_model = "gemini-1.5-flash"
+        except Exception as e3:
+            print(f"❌ All Gemini models failed! Error: {e3}")
+            gemini_client = None
+            selected_model = "None"
 
 # ── Request / Response models ─────────────────────────────
 class ChatRequest(BaseModel):
@@ -159,6 +187,9 @@ def search_wikipedia(query: str) -> Tuple[str, List[Dict]]:
 
 # ── Gemini generation ─────────────────────────────────────
 def generate_with_gemini(query: str, context: str) -> str:
+    if not gemini_client:
+        return "Samahani, mfumo wa Gemini haufanyi kazi. Tafadhali jaribu tena baadaye."
+    
     try:
         prompt = (
             "Wewe ni msaidizi wa Kiswahili. "
@@ -199,6 +230,11 @@ def chat(request: ChatRequest):
     # Creative/grammar — straight to Gemini no RAG
     if is_creative(query):
         try:
+            if not gemini_client:
+                return ChatResponse(
+                    answer="Samahani, Gemini haifanyi kazi.",
+                    sources=[]
+                )
             response = gemini_client.generate_content(
                 f"Jibu kwa Kiswahili:\n{query}"
             )
@@ -207,6 +243,7 @@ def chat(request: ChatRequest):
                 sources=[]
             )
         except Exception as e:
+            print(f"Gemini creative error: {e}")
             return ChatResponse(
                 answer="Samahani, jaribu tena.",
                 sources=[]
@@ -240,4 +277,19 @@ def chat(request: ChatRequest):
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "general-chat"}
+    return {
+        "status": "ok",
+        "service": "general-chat",
+        "gemini_model": selected_model,
+        "gemini_initialized": bool(gemini_client)
+    }
+
+@app.get("/test")
+def test():
+    return {
+        "status": "ok",
+        "gemini_key_set": bool(GOOGLE_API_KEY),
+        "tavily_key_set": bool(TAVILY_API_KEY),
+        "gemini_model": selected_model,
+        "gemini_working": bool(gemini_client)
+    }
