@@ -4,7 +4,4 @@ pydantic
 google-generativeai
 wikipedia-api
 wikipedia
-sentence-transformers
-faiss-cpu
-numpy
 requests

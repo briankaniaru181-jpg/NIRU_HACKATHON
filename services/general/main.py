@@ -7,40 +7,16 @@ from typing import List, Dict, Optional, Tuple
 import google.generativeai as genai
 import wikipediaapi
 import wikipedia
-from sentence_transformers import SentenceTransformer
-import faiss
-import numpy as np
 
 app = FastAPI(title="General Chat Service")
 
 # ── API Keys ─────────────────────────────────────────────
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "")
 TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY", "")
-HF_TOKEN = os.environ.get("HF_TOKEN", "")
-
-# Set Hugging Face token if available (fixes the warning)
-if HF_TOKEN:
-    os.environ["HF_TOKEN"] = HF_TOKEN
-    print("✅ HF_TOKEN found and set")
-else:
-    print("⚠️ No HF_TOKEN found - downloads may be rate-limited")
 
 # Configure Gemini
 genai.configure(api_key=GOOGLE_API_KEY)
 gemini_client = genai.GenerativeModel("gemini-1.5-flash")
-
-# ── Embedding model ───────────────────────────────────────
-print("Loading embedding model...")
-try:
-    # Try the large multilingual model first
-    embedding_model = SentenceTransformer('intfloat/multilingual-e5-large-instruct')
-    print("✅ Embedding model loaded successfully")
-except Exception as e:
-    print(f"⚠️ Error loading large model: {e}")
-    # Fallback to smaller model if token not available or download fails
-    print("🔄 Falling back to smaller model...")
-    embedding_model = SentenceTransformer('sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')
-    print("✅ Fallback model loaded")
 
 # ── Request / Response models ─────────────────────────────
 class ChatRequest(BaseModel):
@@ -92,7 +68,6 @@ def get_search_term(query: str) -> str:
 # ── Tavily ────────────────────────────────────────────────
 def search_tavily(query: str) -> Optional[Dict]:
     if not TAVILY_API_KEY:
-        print("⚠️ TAVILY_API_KEY not set - skipping Tavily search")
         return None
     try:
         r = requests.post(
@@ -145,74 +120,40 @@ def search_wikipedia(query: str) -> Tuple[str, List[Dict]]:
         user_agent='SautiAI/1.0'
     )
     term = get_search_term(query)
-    articles = []
     context = ""
     sources = []
 
     try:
+        # Search English Wikipedia first
         wikipedia.set_lang("en")
-        for title in wikipedia.search(term, results=3):
+        en_results = wikipedia.search(term, results=3)
+        for title in en_results:
             page = wiki_en.page(title)
             if page.exists():
-                articles.append({
+                context += f"[Wikipedia EN - {page.title}]\n{page.summary}\n\n"
+                sources.append({
                     'title': page.title,
-                    'content': page.summary,
                     'url': page.fullurl,
                     'language': 'en'
                 })
                 break
 
-        wikipedia.set_lang("sw")
-        for title in wikipedia.search(term, results=2):
-            page = wiki_sw.page(title)
-            if page.exists():
-                articles.append({
-                    'title': page.title,
-                    'content': page.summary,
-                    'url': page.fullurl,
-                    'language': 'sw'
-                })
-                break
+        # Search Swahili Wikipedia
+        if not context:
+            wikipedia.set_lang("sw")
+            sw_results = wikipedia.search(term, results=3)
+            for title in sw_results:
+                page = wiki_sw.page(title)
+                if page.exists():
+                    context += f"[Wikipedia SW - {page.title}]\n{page.summary}\n\n"
+                    sources.append({
+                        'title': page.title,
+                        'url': page.fullurl,
+                        'language': 'sw'
+                    })
+                    break
     except Exception as e:
         print(f"Wikipedia error: {e}")
-
-    if articles:
-        # Build FAISS index
-        documents = []
-        for article in articles:
-            chunks = [
-                article['content'][i:i+500]
-                for i in range(0, len(article['content']), 450)
-            ]
-            for i, chunk in enumerate(chunks):
-                documents.append({
-                    'title': article['title'],
-                    'content': chunk,
-                    'url': article['url'],
-                    'language': article['language'],
-                })
-
-        texts = [f"passage: {d['content']}" for d in documents]
-        embeddings = embedding_model.encode(
-            texts, show_progress_bar=False
-        )
-        index = faiss.IndexFlatL2(embeddings.shape[1])
-        index.add(embeddings.astype('float32'))
-
-        # Retrieve relevant chunks
-        q_emb = embedding_model.encode([f"query: {query}"])
-        _, indices = index.search(q_emb.astype('float32'), 3)
-
-        for i in indices[0]:
-            if i < len(documents):
-                doc = documents[i]
-                lang_note = " (Kiswahili)" if doc['language'] == 'sw' else ""
-                context += f"[Wikipedia{lang_note} - {doc['title']}]\n{doc['content']}\n\n"
-                sources.append({
-                    'title': doc['title'],
-                    'url': doc['url'],
-                    'language': doc['language']
-                })
 
     return context, sources
 
