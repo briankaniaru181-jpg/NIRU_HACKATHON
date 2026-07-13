@@ -14,31 +14,45 @@ GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "")
 # Configure Gemini
 genai.configure(api_key=GOOGLE_API_KEY)
 
-# ── Try Gemini models ─────────────────────────────────────
+# ── Initialize Gemini with the working model ─────────────
 print("🔄 Initializing Gemini for CBC...")
+print(f"API Key set: {bool(GOOGLE_API_KEY)}")
+
+gemini_client = None
+selected_model = "None"
+
 try:
+    # Use the EXACT same model that worked in General service
     gemini_client = genai.GenerativeModel("gemini-3.1-flash-lite")
     test_response = gemini_client.generate_content("Sema jambo")
     print(f"✅ Gemini 3.1 Flash-Lite connected successfully!")
+    print(f"Test response: {test_response.text[:50]}...")
     selected_model = "gemini-3.1-flash-lite"
 except Exception as e:
     print(f"⚠️ Gemini 3.1 Flash-Lite failed: {e}")
+    
     try:
+        # Fallback to 2.0 Flash-Lite
         gemini_client = genai.GenerativeModel("gemini-2.0-flash-lite")
         test_response = gemini_client.generate_content("Sema jambo")
         print(f"✅ Gemini 2.0 Flash-Lite connected successfully!")
         selected_model = "gemini-2.0-flash-lite"
     except Exception as e2:
         print(f"⚠️ Gemini 2.0 Flash-Lite failed: {e2}")
+        
         try:
+            # Fallback to 1.5 Flash
             gemini_client = genai.GenerativeModel("gemini-1.5-flash")
             test_response = gemini_client.generate_content("Sema jambo")
             print(f"✅ Gemini 1.5 Flash connected successfully!")
             selected_model = "gemini-1.5-flash"
         except Exception as e3:
-            print(f"❌ All Gemini models failed! Error: {e3}")
+            print(f"❌ All Gemini models failed!")
+            print(f"Final error: {e3}")
             gemini_client = None
             selected_model = "None"
+
+print(f"Final status - Model: {selected_model}, Client: {bool(gemini_client)}")
 
 # ── Request / Response models ─────────────────────────────
 class CBCRequest(BaseModel):
@@ -143,7 +157,7 @@ JIBU:"""
 
     except Exception as e:
         print(f"Gemini error: {e}")
-        return "Samahani, kuna hitilafu. Tafadhali jaribu tena."
+        return f"Samahani, kuna hitilafu: {str(e)[:50]}"
 
 # ── Endpoints ─────────────────────────────────────────────
 @app.get("/health")
@@ -152,6 +166,7 @@ def health():
         "status": "ok",
         "service": "cbc",
         "gemini_model": selected_model,
+        "gemini_working": bool(gemini_client),
         "subjects_available": list(CBC_REGISTRY.keys())
     }
 
